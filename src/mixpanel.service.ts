@@ -2,13 +2,14 @@ import { Injectable, Inject } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import Mixpanel from 'mixpanel';
 import type { MixpanelModuleOptions } from './interface.js';
+import { REQUEST_CTX_KEY, MIXPANEL_OPTIONS } from './constant.js';
 
 @Injectable()
 export class MixpanelService {
   private readonly mixpanel: Mixpanel.Mixpanel;
 
   constructor(
-    @Inject('MIXPANEL_OPTIONS') private readonly options: MixpanelModuleOptions,
+    @Inject(MIXPANEL_OPTIONS) private readonly options: MixpanelModuleOptions,
     @Inject(ClsService) private readonly cls: ClsService
   ) {
     this.mixpanel = Mixpanel.init(this.options.token, this.options.initConfig);
@@ -17,8 +18,8 @@ export class MixpanelService {
   track(event: string, properties?: Record<string, any>): void {
     const userId = this.extractUserId();
     const finalProperties = {
+      ...(userId && { distinct_id: userId }),
       ...properties,
-      ...(userId && { distinct_id: userId })
     };
     
     this.mixpanel.track(event, finalProperties);
@@ -29,13 +30,13 @@ export class MixpanelService {
       let userId: string | undefined;
       
       if ('header' in this.options) {
-        const request = this.cls.get('req');
+        const request = this.cls.get(REQUEST_CTX_KEY);
         userId = request?.headers?.[this.options.header.toLowerCase()];
       } else if ('session' in this.options) {
-        const request = this.cls.get('req');
+        const request = this.cls.get(REQUEST_CTX_KEY);
         userId = this.extractValue(this.options.session, request);
       } else if ('user' in this.options) {
-        const request = this.cls.get('req');
+        const request = this.cls.get(REQUEST_CTX_KEY);
         userId = this.extractValue(this.options.user, request);
       }
       

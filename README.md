@@ -27,23 +27,15 @@ pnpm add nestjs-mixpanel nestjs-cls
 
 ### Basic Setup
 
+Use the pre-configured `MixpanelClsModule` for automatic request context setup:
+
 ```typescript
 import { Module } from '@nestjs/common';
-import { MixpanelModule } from 'nestjs-mixpanel';
-import { ClsModule } from 'nestjs-cls';
+import { MixpanelModule, MixpanelClsModule } from 'nestjs-mixpanel';
 
 @Module({
   imports: [
-    // ClsModule must be configured with middleware for request context
-    ClsModule.forRoot({
-      middleware: {
-        mount: true,
-        generateId: true,
-        setup: (cls, req) => {
-          cls.set('req', req);
-        },
-      },
-    }),
+    MixpanelClsModule, // Pre-configured CLS with middleware
     MixpanelModule.forRoot({
       token: 'YOUR_MIXPANEL_TOKEN',
     }),
@@ -51,6 +43,8 @@ import { ClsModule } from 'nestjs-cls';
 })
 export class AppModule {}
 ```
+
+> **Note**: If you already have ClsModule in your app or need custom configuration, see [Custom ClsModule Configuration](#custom-clsmodule-configuration) section. Using Both `MixpanelClsModule` and `ClsModule` is not recommended.
 
 ### Using the Service
 
@@ -118,46 +112,6 @@ MixpanelModule.forRoot({
 })
 ```
 
-### Async Configuration
-
-For dynamic configuration, use `forRootAsync`:
-
-```typescript
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MixpanelModule } from 'nestjs-mixpanel';
-import { ClsModule } from 'nestjs-cls';
-
-@Module({
-  imports: [
-    ConfigModule.forRoot(),
-    // ClsModule must be configured separately when using forRootAsync
-    ClsModule.forRoot({
-      middleware: {
-        mount: true,
-        generateId: true,
-        setup: (cls, req) => {
-          cls.set('req', req);
-        },
-      },
-    }),
-    MixpanelModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        token: config.get('MIXPANEL_TOKEN'),
-        header: 'x-user-id',
-        initConfig: {
-          // Additional Mixpanel configuration
-          api_host: config.get('MIXPANEL_API_HOST'),
-        },
-      }),
-    }),
-  ],
-})
-export class AppModule {}
-```
-
 ## API Reference
 
 ### MixpanelService
@@ -193,11 +147,84 @@ await this.mixpanel.track('custom_event', {
 });
 ```
 
+### Custom ClsModule Configuration
+
+When configuring your own ClsModule instead of using MixpanelClsModule, use the exported `REQUEST_CTX_KEY` to ensure compatibility:
+
+```typescript
+import { Module } from '@nestjs/common';
+import { MixpanelModule, REQUEST_CTX_KEY } from 'nestjs-mixpanel';
+import { ClsModule } from 'nestjs-cls';
+
+@Module({
+  imports: [
+    ClsModule.forRoot({
+      global: true,
+      middleware: {
+        mount: true,
+        generateId: true,
+        setup: (cls, req) => {
+          // Store request data using MixpanelService's expected key
+          cls.set(REQUEST_CTX_KEY, req);
+        },
+      },
+    }),
+    MixpanelModule.forRoot({
+      token: 'YOUR_MIXPANEL_TOKEN',
+      header: 'x-user-id',  // Optional: specify user ID location
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+**When to use this approach:**
+- You already have ClsModule configured in your application
+- You need custom middleware settings
+- You want to share request context with other services
+- You're migrating from a different CLS setup
+
 ### Request Context
 
-The module uses CLS (Continuation-Local Storage) to maintain request context. You must configure `ClsModule` with middleware in your application module to ensure that user identification works correctly across async operations within the same request.
+The module uses CLS (Continuation-Local Storage) to maintain request context. You have two options:
 
-**Important**: When using `MixpanelModule.forRootAsync()`, you must configure `ClsModule` separately in your application module due to NestJS dependency injection constraints.
+1. **MixpanelClsModule**: A pre-configured CLS module that sets up middleware automatically
+2. **Custom ClsModule**: Configure your own ClsModule if you need custom settings
+
+Both options ensure that user identification works correctly across async operations within the same request.
+
+### Limited Usage Without Middleware
+
+If you don't configure ClsModule with middleware, you can still use MixpanelModule with limitations:
+
+```typescript
+@Module({
+  imports: [
+    MixpanelModule.forRoot({
+      token: 'YOUR_MIXPANEL_TOKEN',
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+**Limitations without middleware setup:**
+- No automatic user identification from headers, session, or user objects
+- `cls.getId()` returns `undefined` (no request-scoped ID generation)
+- You must manually provide `distinct_id` in every track call:
+
+```typescript
+// Manual user identification required
+await this.mixpanel.track('event_name', {
+  distinct_id: 'user-123',  // Must be provided manually
+  other_property: 'value',
+});
+```
+
+This approach is suitable for:
+- Background jobs or cron tasks without HTTP context
+- Services where you already have user ID available
+- Testing or development environments
 
 ## Development
 
