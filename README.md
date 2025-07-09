@@ -25,8 +25,6 @@ pnpm add nestjs-mixpanel nestjs-cls
 
 ## Quick Start
 
-### Basic Setup
-
 Use the pre-configured `MixpanelClsModule` for automatic request context setup:
 
 ```typescript
@@ -46,7 +44,6 @@ export class AppModule {}
 
 > **Note**: If you already have ClsModule in your app or need custom configuration, see [Custom ClsModule Configuration](#custom-clsmodule-configuration) section. Using Both `MixpanelClsModule` and `ClsModule` is not recommended.
 
-### Using the Service
 
 ```typescript
 import { Injectable } from '@nestjs/common';
