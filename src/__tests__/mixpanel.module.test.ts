@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MixpanelModule } from '../mixpanel.module.js';
 import { MixpanelService } from '../mixpanel.service.js';
+import { AsyncStorageService } from '../async-storage.service.js';
 import { MixpanelModuleOptions, MixpanelModuleAsyncOptions } from '../interface.js';
 import { describe, it, expect } from 'vitest';
 
@@ -13,12 +14,13 @@ describe('MixpanelModule', () => {
       
       expect(moduleRef.module).toBe(MixpanelModule);
       expect(moduleRef.global).toBe(true);
-      expect(moduleRef.providers).toHaveLength(2);
+      expect(moduleRef.providers).toHaveLength(3);
       expect(moduleRef.providers).toContainEqual({
         provide: 'MIXPANEL_OPTIONS',
         useValue: options,
       });
       expect(moduleRef.providers).toContain(MixpanelService);
+      expect(moduleRef.providers).toContain(AsyncStorageService);
     });
 
     it('should create module with session option', async () => {
@@ -69,13 +71,14 @@ describe('MixpanelModule', () => {
       
       expect(moduleRef.module).toBe(MixpanelModule);
       expect(moduleRef.global).toBe(true);
-      expect(moduleRef.providers).toHaveLength(2);
+      expect(moduleRef.providers).toHaveLength(3);
       expect(moduleRef.providers).toContainEqual({
         provide: 'MIXPANEL_OPTIONS',
         useFactory: options.useFactory,
         inject: options.inject,
       });
       expect(moduleRef.providers).toContain(MixpanelService);
+      expect(moduleRef.providers).toContain(AsyncStorageService);
     });
 
     it('should create module with useFactory and inject dependencies', async () => {

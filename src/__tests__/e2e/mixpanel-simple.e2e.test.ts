@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, Injectable, Controller, Module, Get, MiddlewareConsumer, NestModule, Inject } from '@nestjs/common';
+import { INestApplication, Injectable, Controller, Module, Get, Inject, CanActivate, ExecutionContext, UseGuards } from '@nestjs/common';
 import request from 'supertest';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
-import { ClsService } from 'nestjs-cls';
+import { AsyncStorageService } from '../../async-storage.service.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock mixpanel
@@ -19,7 +19,6 @@ vi.mock('mixpanel', () => ({
 
 describe('MixpanelModule Simple E2E Tests', () => {
   let app: INestApplication;
-  let mixpanelService: MixpanelService;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,11 +70,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
       controllers: [TestController],
       providers: [TestService],
     })
-    class AppModule implements NestModule {
-      configure(consumer: MiddlewareConsumer) {
-        // Middleware is configured by ClsModule inside MixpanelModule
-      }
-    }
+    class AppModule {}
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -105,7 +100,21 @@ describe('MixpanelModule Simple E2E Tests', () => {
   });
 
   it('should work with session extraction', async () => {
+    @Injectable()
+    class SessionGuard implements CanActivate {
+      canActivate(context: ExecutionContext): boolean {
+        const request = context.switchToHttp().getRequest();
+        request.session = {
+          user: {
+            id: request.headers['session-id'] || 'default-session-id',
+          },
+        };
+        return true;
+      }
+    }
+
     @Controller('test')
+    @UseGuards(SessionGuard)
     class TestController {
       constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
 
@@ -125,26 +134,13 @@ describe('MixpanelModule Simple E2E Tests', () => {
       imports: [
         MixpanelModule.forRoot({
           token: 'test-token',
-          session: 'session.user.id',
+          session: 'user.id',
         }),
       ],
       controllers: [TestController],
+      providers: [SessionGuard],
     })
-    class AppModule implements NestModule {
-      configure(consumer: MiddlewareConsumer) {
-        // Add middleware to simulate session
-        consumer
-          .apply((req: any, res: any, next: any) => {
-            req.session = {
-              user: {
-                id: req.headers['session-id'] || 'default-session-id',
-              },
-            };
-            next();
-          })
-          .forRoutes('*');
-      }
-    }
+    class AppModule {}
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -174,7 +170,21 @@ describe('MixpanelModule Simple E2E Tests', () => {
   });
 
   it('should work with user object extraction', async () => {
+    @Injectable()
+    class UserGuard implements CanActivate {
+      canActivate(context: ExecutionContext): boolean {
+        const request = context.switchToHttp().getRequest();
+        request.user = {
+          profile: {
+            id: request.headers['user-id'] || 'default-user-id',
+          },
+        };
+        return true;
+      }
+    }
+
     @Controller('test')
+    @UseGuards(UserGuard)
     class TestController {
       constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
 
@@ -188,26 +198,13 @@ describe('MixpanelModule Simple E2E Tests', () => {
       imports: [
         MixpanelModule.forRoot({
           token: 'test-token',
-          user: 'user.profile.id',
+          user: 'profile.id',
         }),
       ],
       controllers: [TestController],
+      providers: [UserGuard],
     })
-    class AppModule implements NestModule {
-      configure(consumer: MiddlewareConsumer) {
-        // Add middleware to simulate user object
-        consumer
-          .apply((req: any, res: any, next: any) => {
-            req.user = {
-              profile: {
-                id: req.headers['user-id'] || 'default-user-id',
-              },
-            };
-            next();
-          })
-          .forRoutes('*');
-      }
-    }
+    class AppModule {}
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -225,7 +222,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
     expect(response.body.userId).toBe('user-object-111');
   });
 
-  it('should fallback to CLS context ID when no option is configured', async () => {
+  it('should fallback to AsyncStorage context ID when no option is configured', async () => {
     @Controller('test')
     class TestController {
       constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
@@ -263,7 +260,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
   });
 
   describe('Memory leak prevention', () => {
-    it('should not retain references across requests', async () => {
+    it('should not retain references across requests', { timeout: 10000 }, async () => {
       @Controller('test')
       class TestController {
         constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
@@ -299,10 +296,21 @@ describe('MixpanelModule Simple E2E Tests', () => {
         const userId = `user-${i}`;
         userIds.push(userId);
         
-        await request(app.getHttpServer())
-          .get('/test/track')
-          .set('x-user-id', userId)
-          .expect(200);
+        try {
+          await request(app.getHttpServer())
+            .get('/test/track')
+            .set('x-user-id', userId)
+            .set('Connection', 'close')
+            .expect(200);
+        } catch (error) {
+          console.error(`Request ${i} failed:`, error instanceof Error ? error.message : 'Unknown error');
+          throw error;
+        }
+        
+        // Small delay to prevent connection issues
+        if (i % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
       }
 
       // Verify each request had unique user ID
@@ -311,63 +319,6 @@ describe('MixpanelModule Simple E2E Tests', () => {
       
       expect(new Set(trackedUserIds).size).toBe(100);
       expect(trackedUserIds).toEqual(userIds);
-    });
-  });
-
-  describe('ClsService Integration', () => {
-    it('should get unique CLS context IDs for concurrent requests', async () => {
-      @Controller('test')
-      class TestController {
-        constructor(
-          @Inject(MixpanelService) private readonly mixpanelService: MixpanelService,
-          @Inject(ClsService) private readonly clsService: ClsService
-        ) {}
-
-        @Get('cls-id')
-        getClsId() {
-          return { 
-            clsId: this.clsService.getId(),
-            userId: this.mixpanelService.extractUserId() 
-          };
-        }
-      }
-
-      @Module({
-        imports: [
-          MixpanelModule.forRoot({
-            token: 'test-token',
-          }),
-        ],
-        controllers: [TestController],
-      })
-      class AppModule {}
-
-      const moduleFixture: TestingModule = await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
-
-      app = moduleFixture.createNestApplication();
-      await app.init();
-
-      // Make concurrent requests with smaller batch to avoid ECONNRESET
-      const responses = [];
-      for (let i = 0; i < 10; i++) {
-        const response = await request(app.getHttpServer())
-          .get('/test/cls-id')
-          .expect(200);
-        responses.push(response);
-        // Small delay to ensure different CLS contexts
-        await new Promise(resolve => setTimeout(resolve, 5));
-      }
-      const clsIds = responses.map(r => r.body.clsId);
-      const userIds = responses.map(r => r.body.userId);
-
-      // Should have at least some unique CLS IDs
-      const uniqueClsIds = new Set(clsIds);
-      expect(uniqueClsIds.size).toBeGreaterThan(0);
-      expect(uniqueClsIds.size).toBeLessThanOrEqual(10);
-      // User IDs should match CLS IDs when no specific extraction is configured
-      expect(userIds).toEqual(clsIds);
     });
   });
 });

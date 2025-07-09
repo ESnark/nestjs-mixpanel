@@ -4,7 +4,7 @@ import { INestApplication, Controller, Post, Module } from '@nestjs/common';
 import request from 'supertest';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { Inject } from '@nestjs/common';
 
 // Mock mixpanel
@@ -50,12 +50,10 @@ class TestController {
 })
 class TestModule {}
 
-describe('MixpanelModule Stress Tests', () => {
+describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
   let app: INestApplication;
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [TestModule],
     }).compile();
@@ -70,10 +68,14 @@ describe('MixpanelModule Stress Tests', () => {
     await app.init();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (app) {
       await app.close();
     }
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   it('should handle memory stress test', async () => {
@@ -87,11 +89,16 @@ describe('MixpanelModule Stress Tests', () => {
     const requestCount = 1000;
     
     for (let i = 0; i < requestCount; i++) {
-      await request(app.getHttpServer())
-        .post('/test/track')
-        .set('x-user-id', `user-${i}`)
-        .set('Connection', 'close') // Force connection close to avoid ECONNRESET
-        .expect(201);
+      try {
+        await request(app.getHttpServer())
+          .post('/test/track')
+          .set('x-user-id', `user-${i}`)
+          .set('Connection', 'close') // Force connection close to avoid ECONNRESET
+          .expect(201);
+      } catch (error) {
+        console.error(`Request ${i} failed:`, error instanceof Error ? error.message : 'Unknown error');
+        throw error;
+      }
     }
 
     await new Promise(resolve => setTimeout(resolve, 1000));

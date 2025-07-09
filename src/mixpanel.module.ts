@@ -1,13 +1,15 @@
-import { DynamicModule, Module } from '@nestjs/common';
+import { DynamicModule, Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { MixpanelService } from './mixpanel.service.js';
 import { MixpanelModuleOptions, MixpanelModuleAsyncOptions } from './interface.js';
 import { MIXPANEL_OPTIONS } from './constant.js';
+import { AsyncStorageService } from './async-storage.service.js';
+import { AsyncStorageMiddleware } from './async-storage.middleware.js';
 
-@Module({
-  providers: [MixpanelService],
-  exports: [MixpanelService],
-})
-export class MixpanelModule {
+@Module({})
+export class MixpanelModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AsyncStorageMiddleware).forRoutes('*');
+  }
   static forRoot(options: MixpanelModuleOptions): DynamicModule {
     return {
       global: true,
@@ -18,6 +20,7 @@ export class MixpanelModule {
           useValue: options,
         },
         MixpanelService,
+        AsyncStorageService,
       ],
       exports: [MixpanelService],
     };
@@ -34,6 +37,7 @@ export class MixpanelModule {
           inject: options.inject,
         },
         MixpanelService,
+        AsyncStorageService,
       ],
       exports: [MixpanelService],
     };

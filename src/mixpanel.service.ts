@@ -1,8 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { ClsService } from 'nestjs-cls';
+import { AsyncStorageService } from './async-storage.service.js';
 import Mixpanel from 'mixpanel';
 import type { MixpanelModuleOptions } from './interface.js';
-import { REQUEST_CTX_KEY, MIXPANEL_OPTIONS } from './constant.js';
+import { MIXPANEL_OPTIONS } from './constant.js';
 
 @Injectable()
 export class MixpanelService {
@@ -10,7 +10,7 @@ export class MixpanelService {
 
   constructor(
     @Inject(MIXPANEL_OPTIONS) private readonly options: MixpanelModuleOptions,
-    @Inject(ClsService) private readonly cls: ClsService
+    @Inject(AsyncStorageService) private readonly asyncStorage: AsyncStorageService
   ) {
     this.mixpanel = Mixpanel.init(this.options.token, this.options.initConfig);
   }
@@ -30,18 +30,18 @@ export class MixpanelService {
       let userId: string | undefined;
       
       if ('header' in this.options) {
-        const request = this.cls.get(REQUEST_CTX_KEY);
+        const request = this.asyncStorage.getRequest();
         userId = request?.headers?.[this.options.header.toLowerCase()];
       } else if ('session' in this.options) {
-        const request = this.cls.get(REQUEST_CTX_KEY);
-        userId = this.extractValue(this.options.session, request);
+        const session = this.asyncStorage.getSession();
+        userId = this.extractValue(this.options.session, session);
       } else if ('user' in this.options) {
-        const request = this.cls.get(REQUEST_CTX_KEY);
-        userId = this.extractValue(this.options.user, request);
+        const user = this.asyncStorage.getUser();
+        userId = this.extractValue(this.options.user, user);
       }
       
-      // Fallback to CLS context ID if no specific field is configured or extraction failed
-      return userId || this.cls.getId();
+      // Fallback to AsyncStorage context ID if no specific field is configured or extraction failed
+      return userId || this.asyncStorage.getId();
     } catch (error) {
       console.warn('Failed to extract user ID from request:', error);
     }

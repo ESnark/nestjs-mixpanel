@@ -6,7 +6,8 @@ A powerful NestJS module for seamless Mixpanel analytics integration with automa
 
 - **Easy Integration** - Simple setup with NestJS dependency injection
 - **Flexible User Identification** - Multiple strategies for automatic user tracking
-- **Request Context Management** - Built-in CLS (Continuation-Local Storage) support
+- **Request Context Management** - Built-in AsyncLocalStorage for request isolation
+- **Dynamic Data Access** - Real-time access to request, session, and user data
 - **Full Mixpanel API** - Access to complete Mixpanel functionality
 - **TypeScript Support** - Fully typed with TypeScript definitions
 - **Well Tested** - Comprehensive test suite with unit, integration, and e2e tests
@@ -14,26 +15,21 @@ A powerful NestJS module for seamless Mixpanel analytics integration with automa
 ## Installation
 
 ```bash
-npm install nestjs-mixpanel nestjs-cls
+npm install nestjs-mixpanel
 # or
-yarn add nestjs-mixpanel nestjs-cls
+yarn add nestjs-mixpanel
 # or
-pnpm add nestjs-mixpanel nestjs-cls
+pnpm add nestjs-mixpanel
 ```
-
-**Note**: `nestjs-cls` is a peer dependency and must be installed separately.
 
 ## Quick Start
 
-Use the pre-configured `MixpanelClsModule` for automatic request context setup:
-
 ```typescript
 import { Module } from '@nestjs/common';
-import { MixpanelModule, MixpanelClsModule } from 'nestjs-mixpanel';
+import { MixpanelModule } from 'nestjs-mixpanel';
 
 @Module({
   imports: [
-    MixpanelClsModule, // Pre-configured CLS with middleware
     MixpanelModule.forRoot({
       token: 'YOUR_MIXPANEL_TOKEN',
     }),
@@ -41,8 +37,6 @@ import { MixpanelModule, MixpanelClsModule } from 'nestjs-mixpanel';
 })
 export class AppModule {}
 ```
-
-> **Note**: If you already have ClsModule in your app or need custom configuration, see [Custom ClsModule Configuration](#custom-clsmodule-configuration) section. Using Both `MixpanelClsModule` and `ClsModule` is not recommended.
 
 
 ```typescript
@@ -98,14 +92,14 @@ MixpanelModule.forRoot({
 })
 ```
 
-#### 4. CLS Context ID (Default)
+#### 4. AsyncStorage Context ID (Default)
 
-If no identification strategy is specified, the module will use a unique ID from the CLS context:
+If no identification strategy is specified, the module will use a unique ID from the AsyncLocalStorage context:
 
 ```typescript
 MixpanelModule.forRoot({
   token: 'YOUR_MIXPANEL_TOKEN',
-  // Will use CLS context ID as distinct_id
+  // Will use AsyncLocalStorage context ID as distinct_id
 })
 ```
 
@@ -144,51 +138,15 @@ await this.mixpanel.track('custom_event', {
 });
 ```
 
-### Custom ClsModule Configuration
-
-When configuring your own ClsModule instead of using MixpanelClsModule, use the exported `REQUEST_CTX_KEY` to ensure compatibility:
-
-```typescript
-import { Module } from '@nestjs/common';
-import { MixpanelModule, REQUEST_CTX_KEY } from 'nestjs-mixpanel';
-import { ClsModule } from 'nestjs-cls';
-
-@Module({
-  imports: [
-    ClsModule.forRoot({
-      global: true,
-      middleware: {
-        mount: true,
-        generateId: true,
-        setup: (cls, req) => {
-          // Store request data using MixpanelService's expected key
-          cls.set(REQUEST_CTX_KEY, req);
-        },
-      },
-    }),
-    MixpanelModule.forRoot({
-      token: 'YOUR_MIXPANEL_TOKEN',
-      header: 'x-user-id',  // Optional: specify user ID location
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-**When to use this approach:**
-- You already have ClsModule configured in your application
-- You need custom middleware settings
-- You want to share request context with other services
-- You're migrating from a different CLS setup
 
 ### Request Context
 
-The module uses CLS (Continuation-Local Storage) to maintain request context. You have two options:
+The module uses AsyncLocalStorage to maintain request context automatically. This ensures that:
 
-1. **MixpanelClsModule**: A pre-configured CLS module that sets up middleware automatically
-2. **Custom ClsModule**: Configure your own ClsModule if you need custom settings
-
-Both options ensure that user identification works correctly across async operations within the same request.
+- Each request has its own isolated context
+- User identification works correctly across async operations
+- No memory leaks between requests
+- Guards and middleware can dynamically set user/session data
 
 ## Development
 

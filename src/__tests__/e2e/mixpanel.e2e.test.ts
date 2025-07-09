@@ -1,10 +1,9 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, Controller, Post, Module, MiddlewareConsumer, Inject } from '@nestjs/common';
+import { INestApplication, Controller, Post, Module, Inject, Injectable, CanActivate, ExecutionContext, UseGuards } from '@nestjs/common';
 import request from 'supertest';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
-import { ClsModule, ClsMiddleware } from 'nestjs-cls';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock mixpanel
@@ -100,41 +99,65 @@ describe('MixpanelModule E2E Tests', () => {
       });
     });
 
-    it('should fallback to CLS context ID when header is missing', async () => {
+    it('should fallback to AsyncStorage context ID when header is missing', async () => {
       const response = await request(app.getHttpServer())
         .post('/extract-user-id')
         .expect(201);
 
       expect(response.body.userId).toBeDefined();
-      expect(response.body.userId).toMatch(/^[a-zA-Z0-9-]+$/); // CLS generates UUID-like IDs
+      expect(response.body.userId).toMatch(/^[a-zA-Z0-9-]+$/); // AsyncStorage generates UUID-like IDs
     });
   });
 
   describe('Session extraction', () => {
     beforeEach(async () => {
-      // Add middleware to simulate session
+      // Guard to set session data
+      @Injectable()
+      class SessionGuard implements CanActivate {
+        canActivate(context: ExecutionContext): boolean {
+          const request = context.switchToHttp().getRequest();
+          request.session = {
+            user: {
+              id: request.headers['session-user-id'] || 'session-default-123',
+            },
+          };
+          return true;
+        }
+      }
+
+      // Controller with guard
+      @Controller()
+      @UseGuards(SessionGuard)
+      class TestControllerWithSession {
+        constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {
+          console.log('TestControllerWithSession created with mixpanelService:', mixpanelService);
+        }
+
+        @Post('track')
+        track() {
+          this.mixpanelService.track('test-event', { action: 'e2e-test' });
+          return { success: true };
+        }
+
+        @Post('extract-user-id')
+        extractUserId() {
+          console.log('extractUserId called in session test, mixpanelService:', this.mixpanelService);
+          const userId = this.mixpanelService.extractUserId();
+          return { userId };
+        }
+      }
+
       @Module({
         imports: [
           MixpanelModule.forRoot({
             token: 'test-token',
-            session: 'session.user.id',
+            session: 'user.id',
           }),
         ],
-        controllers: [TestController],
+        controllers: [TestControllerWithSession],
+        providers: [SessionGuard],
       })
-      class TestModuleWithSession {
-        configure(consumer: MiddlewareConsumer) {
-          // Add middleware to inject session data
-          consumer.apply((req: any, res: any, next: any) => {
-            req.session = {
-              user: {
-                id: req.headers['session-user-id'] || 'session-default-123',
-              },
-            };
-            next();
-          }).forRoutes('*');
-        }
-      }
+      class TestModuleWithSession {}
 
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [TestModuleWithSession],
@@ -176,29 +199,53 @@ describe('MixpanelModule E2E Tests', () => {
 
   describe('User extraction', () => {
     beforeEach(async () => {
-      // Add middleware to simulate user object
+      // Guard to set user data
+      @Injectable()
+      class UserGuard implements CanActivate {
+        canActivate(context: ExecutionContext): boolean {
+          const request = context.switchToHttp().getRequest();
+          request.user = {
+            profile: {
+              userId: request.headers['auth-user-id'] || 'auth-default-456',
+            },
+          };
+          return true;
+        }
+      }
+
+      // Controller with guard
+      @Controller()
+      @UseGuards(UserGuard)
+      class TestControllerWithUser {
+        constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {
+          console.log('TestControllerWithUser created with mixpanelService:', mixpanelService);
+        }
+
+        @Post('track')
+        track() {
+          this.mixpanelService.track('test-event', { action: 'e2e-test' });
+          return { success: true };
+        }
+
+        @Post('extract-user-id')
+        extractUserId() {
+          console.log('extractUserId called in user test, mixpanelService:', this.mixpanelService);
+          const userId = this.mixpanelService.extractUserId();
+          return { userId };
+        }
+      }
+
       @Module({
         imports: [
           MixpanelModule.forRoot({
             token: 'test-token',
-            user: 'user.profile.userId',
+            user: 'profile.userId',
           }),
         ],
-        controllers: [TestController],
+        controllers: [TestControllerWithUser],
+        providers: [UserGuard],
       })
-      class TestModuleWithUser {
-        configure(consumer: MiddlewareConsumer) {
-          // Add middleware to inject user data
-          consumer.apply((req: any, res: any, next: any) => {
-            req.user = {
-              profile: {
-                userId: req.headers['auth-user-id'] || 'auth-default-456',
-              },
-            };
-            next();
-          }).forRoutes('*');
-        }
-      }
+      class TestModuleWithUser {}
 
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [TestModuleWithUser],
@@ -230,8 +277,8 @@ describe('MixpanelModule E2E Tests', () => {
     });
   });
 
-  describe('CLS Context', () => {
-    it('should properly clean up CLS context', async () => {
+  describe('AsyncStorage Context', () => {
+    it('should properly clean up AsyncStorage context', async () => {
       const TestModule = createTestModule({});
       
       const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -243,8 +290,8 @@ describe('MixpanelModule E2E Tests', () => {
 
       const userIds = new Set<string>();
 
-      // Make multiple requests and collect CLS IDs
-      // Use sequential requests with small delays to ensure different CLS contexts
+      // Make multiple requests and collect AsyncStorage IDs
+      // Use sequential requests with small delays to ensure different AsyncStorage contexts
       for (let i = 0; i < 10; i++) {
         const response = await request(app.getHttpServer())
           .post('/extract-user-id')
@@ -254,11 +301,11 @@ describe('MixpanelModule E2E Tests', () => {
           userIds.add(response.body.userId);
         }
         
-        // Small delay to ensure different CLS contexts
+        // Small delay to ensure different AsyncStorage contexts
         await new Promise(resolve => setTimeout(resolve, 10));
       }
 
-      // All requests should have different CLS IDs
+      // All requests should have different AsyncStorage IDs
       expect(userIds.size).toBeGreaterThan(0);
     });
   });

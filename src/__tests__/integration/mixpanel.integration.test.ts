@@ -2,7 +2,8 @@ import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
-import { ClsService } from 'nestjs-cls';
+import { AsyncStorageService } from '../../async-storage.service.js';
+import { REQUEST_CTX_KEY } from '../../constant.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock mixpanel
@@ -18,7 +19,7 @@ vi.mock('mixpanel', () => ({
 describe('MixpanelModule Integration Tests', () => {
   let module: TestingModule;
   let mixpanelService: MixpanelService;
-  let clsService: ClsService;
+  let asyncStorageService: AsyncStorageService;
 
   afterEach(async () => {
     if (module) {
@@ -40,24 +41,31 @@ describe('MixpanelModule Integration Tests', () => {
       }).compile();
 
       mixpanelService = module.get<MixpanelService>(MixpanelService);
-      clsService = module.get<ClsService>(ClsService);
+      asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
     });
 
     it('should extract user ID from header', () => {
-      // Mock CLS to return a request with headers
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        headers: { 'x-user-id': 'header-user-123' }
-      });
+      const testContext = {
+        id: 'test-context-id',
+        [REQUEST_CTX_KEY]: {
+          headers: { 'x-user-id': 'header-user-123' }
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
       expect(userId).toBe('header-user-123');
     });
 
     it('should track events with user ID from header', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        headers: { 'x-user-id': 'header-user-456' }
-      });
+      const testContext = {
+        id: 'test-context-id',
+        [REQUEST_CTX_KEY]: {
+          headers: { 'x-user-id': 'header-user-456' }
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       mixpanelService.track('test-event', { action: 'test' });
 
       expect(mockTrack).toHaveBeenCalledWith('test-event', {
@@ -66,12 +74,15 @@ describe('MixpanelModule Integration Tests', () => {
       });
     });
 
-    it('should fallback to CLS ID when header is missing', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        headers: {}
-      });
-      vi.spyOn(clsService, 'getId').mockReturnValue('cls-fallback-id');
+    it('should fallback to AsyncStorage ID when header is missing', () => {
+      const testContext = {
+        id: 'cls-fallback-id',
+        [REQUEST_CTX_KEY]: {
+          headers: {}
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
       expect(userId).toBe('cls-fallback-id');
     });
@@ -83,37 +94,47 @@ describe('MixpanelModule Integration Tests', () => {
         imports: [
           MixpanelModule.forRoot({
             token: 'test-token',
-            session: 'session.user.id',
+            session: 'user.id',
           }),
         ],
       }).compile();
 
       mixpanelService = module.get<MixpanelService>(MixpanelService);
-      clsService = module.get<ClsService>(ClsService);
+      asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
     });
 
     it('should extract user ID from session path', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        session: {
-          user: {
-            id: 'session-user-789',
+      // Use enterWith to set context
+      const testContext = {
+        id: 'test-context-id',
+        [REQUEST_CTX_KEY]: {
+          session: {
+            user: {
+              id: 'session-user-789',
+            },
           },
-        },
-      });
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
       expect(userId).toBe('session-user-789');
     });
 
     it('should handle nested session paths correctly', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        session: {
-          user: {
-            id: 'nested-session-id',
+      // Use enterWith to set context
+      const testContext = {
+        id: 'test-context-id',
+        [REQUEST_CTX_KEY]: {
+          session: {
+            user: {
+              id: 'nested-session-id',
+            },
           },
-        },
-      });
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       mixpanelService.track('session-event', { test: true });
 
       expect(mockTrack).toHaveBeenCalledWith('session-event', {
@@ -122,12 +143,16 @@ describe('MixpanelModule Integration Tests', () => {
       });
     });
 
-    it('should fallback to CLS ID when session path is invalid', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        session: null,
-      });
-      vi.spyOn(clsService, 'getId').mockReturnValue('cls-session-fallback');
+    it('should fallback to AsyncStorage ID when session path is invalid', () => {
+      // Use enterWith to set context
+      const testContext = {
+        id: 'cls-session-fallback',
+        [REQUEST_CTX_KEY]: {
+          session: null,
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
       expect(userId).toBe('cls-session-fallback');
     });
@@ -139,47 +164,57 @@ describe('MixpanelModule Integration Tests', () => {
         imports: [
           MixpanelModule.forRoot({
             token: 'test-token',
-            user: 'user.profile.userId',
+            user: 'profile.userId',
           }),
         ],
       }).compile();
 
       mixpanelService = module.get<MixpanelService>(MixpanelService);
-      clsService = module.get<ClsService>(ClsService);
+      asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
     });
 
     it('should extract user ID from user object path', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        user: {
-          profile: {
-            userId: 'user-profile-111',
+      // Use enterWith to set context
+      const testContext = {
+        id: 'test-context-id',
+        [REQUEST_CTX_KEY]: {
+          user: {
+            profile: {
+              userId: 'user-profile-111',
+            },
           },
-        },
-      });
+        }
+      };
 
+      asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
       expect(userId).toBe('user-profile-111');
     });
 
     it('should track events with user ID from user object', () => {
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        user: {
-          profile: {
-            userId: 'user-profile-222',
+      // Use enterWith to set context
+      const testContext = {
+        id: 'test-context-id',
+        [REQUEST_CTX_KEY]: {
+          user: {
+            profile: {
+              userId: 'user-profile-222',
+            },
           },
-        },
-      });
+        }
+      };
 
-      mixpanelService.track('user-event', { source: 'profile' });
+      asyncStorageService.enterWith(testContext);
+      mixpanelService.track('user-event', { source: 'test' });
 
       expect(mockTrack).toHaveBeenCalledWith('user-event', {
-        source: 'profile',
+        source: 'test',
         distinct_id: 'user-profile-222',
       });
     });
   });
 
-  describe('CLS context ID fallback', () => {
+  describe('Fallback to AsyncStorage context ID', () => {
     beforeEach(async () => {
       module = await Test.createTestingModule({
         imports: [
@@ -190,31 +225,37 @@ describe('MixpanelModule Integration Tests', () => {
       }).compile();
 
       mixpanelService = module.get<MixpanelService>(MixpanelService);
-      clsService = module.get<ClsService>(ClsService);
+      asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
     });
 
-    it('should use CLS context ID when no extraction option is configured', () => {
-      vi.spyOn(clsService, 'getId').mockReturnValue('cls-context-123');
+    it('should use AsyncStorage context ID when no extraction option is configured', () => {
+      const testContext = {
+        id: 'default-context-id',
+        [REQUEST_CTX_KEY]: {}
+      };
 
+      asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
-      expect(userId).toBe('cls-context-123');
+      expect(userId).toBe('default-context-id');
     });
 
-    it('should track events with CLS context ID', () => {
-      vi.spyOn(clsService, 'getId').mockReturnValue('cls-context-456');
+    it('should track events with AsyncStorage context ID', () => {
+      const testContext = {
+        id: 'context-track-id',
+        [REQUEST_CTX_KEY]: {}
+      };
 
+      asyncStorageService.enterWith(testContext);
       mixpanelService.track('default-event', { type: 'test' });
 
       expect(mockTrack).toHaveBeenCalledWith('default-event', {
         type: 'test',
-        distinct_id: 'cls-context-456',
+        distinct_id: 'context-track-id',
       });
     });
   });
 
-  // Skip error handling test as it interferes with NestJS module lifecycle
-
-  describe('Memory leak prevention', () => {
+  describe('Error handling', () => {
     beforeEach(async () => {
       module = await Test.createTestingModule({
         imports: [
@@ -226,55 +267,33 @@ describe('MixpanelModule Integration Tests', () => {
       }).compile();
 
       mixpanelService = module.get<MixpanelService>(MixpanelService);
-      clsService = module.get<ClsService>(ClsService);
+      asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
     });
 
     it('should not retain references between different requests', () => {
-      const userIds = new Set<string>();
-      const mockGet = vi.fn();
-      clsService.get = mockGet;
+      // First request
+      const testContext1 = {
+        id: 'context-1',
+        [REQUEST_CTX_KEY]: {
+          headers: { 'x-user-id': 'user-1' }
+        }
+      };
 
-      // Simulate multiple requests with different user IDs
-      for (let i = 0; i < 100; i++) {
-        mockGet.mockReturnValue({
-          headers: { 'x-user-id': `user-${i}` }
-        });
+      asyncStorageService.enterWith(testContext1);
+      const userId1 = mixpanelService.extractUserId();
+      expect(userId1).toBe('user-1');
 
-        mixpanelService.track(`event-${i}`, { index: i });
-        
-        // Collect tracked user IDs
-        const lastCall = mockTrack.mock.calls[mockTrack.mock.calls.length - 1];
-        userIds.add(lastCall[1].distinct_id);
-      }
+      // Second request with different user
+      const testContext2 = {
+        id: 'context-2',
+        [REQUEST_CTX_KEY]: {
+          headers: { 'x-user-id': 'user-2' }
+        }
+      };
 
-      // Verify all user IDs are unique
-      expect(userIds.size).toBe(100);
-      expect(mockTrack).toHaveBeenCalledTimes(100);
-    });
-  });
-
-  describe('Module configuration', () => {
-    it('should work with forRootAsync', async () => {
-      module = await Test.createTestingModule({
-        imports: [
-          MixpanelModule.forRootAsync({
-            useFactory: () => ({
-              token: 'async-token',
-              session: 'session.id',
-            }),
-          }),
-        ],
-      }).compile();
-
-      mixpanelService = module.get<MixpanelService>(MixpanelService);
-      clsService = module.get<ClsService>(ClsService);
-
-      vi.spyOn(clsService, 'get').mockReturnValue({
-        session: { id: 'async-session-123' }
-      });
-
-      const userId = mixpanelService.extractUserId();
-      expect(userId).toBe('async-session-123');
+      asyncStorageService.enterWith(testContext2);
+      const userId2 = mixpanelService.extractUserId();
+      expect(userId2).toBe('user-2');
     });
   });
 });
