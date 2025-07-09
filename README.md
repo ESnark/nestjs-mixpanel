@@ -193,39 +193,6 @@ The module uses CLS (Continuation-Local Storage) to maintain request context. Yo
 
 Both options ensure that user identification works correctly across async operations within the same request.
 
-### Limited Usage Without Middleware
-
-If you don't configure ClsModule with middleware, you can still use MixpanelModule with limitations:
-
-```typescript
-@Module({
-  imports: [
-    MixpanelModule.forRoot({
-      token: 'YOUR_MIXPANEL_TOKEN',
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-**Limitations without middleware setup:**
-- No automatic user identification from headers, session, or user objects
-- `cls.getId()` returns `undefined` (no request-scoped ID generation)
-- You must manually provide `distinct_id` in every track call:
-
-```typescript
-// Manual user identification required
-await this.mixpanel.track('event_name', {
-  distinct_id: 'user-123',  // Must be provided manually
-  other_property: 'value',
-});
-```
-
-This approach is suitable for:
-- Background jobs or cron tasks without HTTP context
-- Services where you already have user ID available
-- Testing or development environments
-
 ## Development
 
 ### Building
