@@ -12,18 +12,7 @@ export class MixpanelModule {
     return {
       global: true,
       module: MixpanelModule,
-      imports: [
-        ClsModule.forRoot({
-          global: true,
-          middleware: {
-            mount: true,
-            generateId: true,
-            setup: (cls, req) => {
-              cls.set('req', req);
-            },
-          },
-        }),
-      ],
+      imports: [ClsModule],
       providers: [
         {
           provide: 'MIXPANEL_OPTIONS',
@@ -39,18 +28,7 @@ export class MixpanelModule {
     return {
       global: true,
       module: MixpanelModule,
-      imports: [
-        ClsModule.forRoot({
-          global: true,
-          middleware: {
-            mount: true,
-            generateId: true,
-            setup: (cls, req) => {
-              cls.set('req', req);
-            },
-          },
-        }),
-      ],
+      imports: [ClsModule],
       providers: [
         {
           provide: 'MIXPANEL_OPTIONS',
