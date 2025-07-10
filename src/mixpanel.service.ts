@@ -4,6 +4,8 @@ import Mixpanel from 'mixpanel';
 import type { MixpanelModuleOptions } from './interface.js';
 import { MIXPANEL_OPTIONS } from './constant.js';
 
+type TrackFunction = (event: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback) => void;
+
 @Injectable()
 export class MixpanelService {
   private readonly mixpanel: Mixpanel.Mixpanel;
@@ -15,14 +17,43 @@ export class MixpanelService {
     this.mixpanel = Mixpanel.init(this.options.token, this.options.initConfig);
   }
 
-  track(event: string, properties?: Record<string, any>): void {
+  track: TrackFunction = (event, properties, callback) => {
     const userId = this.extractUserId();
     const finalProperties = {
       ...(userId && { distinct_id: userId }),
       ...properties,
     };
 
-    this.mixpanel.track(event, finalProperties);
+    this.mixpanel.track(event, finalProperties, callback);
+  }
+
+  private peopleSet(distinctId: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void;
+  private peopleSet(properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void;
+  private peopleSet(arg1: string | Mixpanel.PropertyDict, arg2: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void {
+    if (typeof arg1 === 'string') {
+      this.mixpanel.people.set(arg1, arg2, callback);
+    } else {
+      const userId = this.extractUserId();
+      this.mixpanel.people.set(userId, arg1, callback);
+    }
+  };
+
+  private peopleSetOnce(distinctId: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void;
+  private peopleSetOnce(properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void;
+  private peopleSetOnce(arg1: string | Mixpanel.PropertyDict, arg2: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void {
+    if (typeof arg1 === 'string') {
+      this.mixpanel.people.set_once(arg1, arg2, callback);
+    } else {
+      const userId = this.extractUserId();
+      this.mixpanel.people.set_once(userId, arg1, callback);
+    }
+  }
+
+  get people() {
+    return {
+      set: this.peopleSet,
+      setOnce: this.peopleSetOnce,
+    };
   }
 
   extractUserId(): string | undefined {

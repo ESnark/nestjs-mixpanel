@@ -47,8 +47,8 @@ import { MixpanelService } from 'nestjs-mixpanel';
 export class AnalyticsService {
   constructor(private readonly mixpanel: MixpanelService) {}
 
-  async trackUserAction(action: string, properties?: any) {
-    await this.mixpanel.track(action, properties);
+  trackUserAction(action: string, properties?: any) {
+    this.mixpanel.track(action, properties);
   }
 }
 ```
@@ -107,23 +107,89 @@ MixpanelModule.forRoot({
 
 ### MixpanelService
 
-#### `track(event: string, properties?: any): Promise<void>`
+#### `track(event: string, properties?: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
 
 Tracks an event in Mixpanel with automatic user identification.
 
 ```typescript
 // Basic event tracking
-await this.mixpanel.track('page_viewed');
+this.mixpanel.track('page_viewed');
 
 // With custom properties
-await this.mixpanel.track('purchase_completed', {
+this.mixpanel.track('purchase_completed', {
   amount: 99.99,
   currency: 'USD',
   items: ['item1', 'item2'],
 });
+
+// With callback
+this.mixpanel.track('purchase_completed', {
+  amount: 99.99,
+}, (err) => {
+  if (err) {
+    console.error('Failed to track event:', err);
+  }
+});
 ```
 
 The `distinct_id` is automatically set based on your configured identification strategy.
+
+#### `people.set(distinctId: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
+#### `people.set(properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
+
+Sets properties on a user profile. Can be called with or without a specific user ID.
+
+```typescript
+// With explicit user ID
+this.mixpanel.people.set('user-123', {
+  name: 'John Doe',
+  email: 'john@example.com',
+  plan: 'premium',
+});
+
+// With automatic user identification
+this.mixpanel.people.set({
+  name: 'John Doe',
+  email: 'john@example.com',
+  plan: 'premium',
+});
+
+// With callback
+this.mixpanel.people.set({
+  name: 'John Doe',
+}, (err) => {
+  if (err) console.error('Failed to set properties:', err);
+});
+```
+
+#### `people.setOnce(distinctId: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
+#### `people.setOnce(properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
+
+Sets properties on a user profile only if they are not already set.
+
+```typescript
+// With automatic user identification
+this.mixpanel.people.setOnce({
+  created_at: new Date().toISOString(),
+  initial_source: 'organic',
+});
+
+// With explicit user ID
+this.mixpanel.people.setOnce('user-123', {
+  created_at: new Date().toISOString(),
+});
+
+// With callback
+this.mixpanel.people.setOnce({
+  created_at: new Date().toISOString(),
+}, (err) => {
+  if (err) console.error('Failed to set properties:', err);
+});
+```
+
+#### `extractUserId(): string | undefined`
+
+Internal method that extracts the user ID based on the configured identification strategy. Returns the extracted user ID or falls back to the AsyncLocalStorage context ID.
 
 ## Advanced Usage
 
@@ -132,7 +198,7 @@ The `distinct_id` is automatically set based on your configured identification s
 You can override the automatic user identification by providing a `distinct_id` in the properties:
 
 ```typescript
-await this.mixpanel.track('custom_event', {
+this.mixpanel.track('custom_event', {
   distinct_id: 'custom-user-123',
   customProp: 'value',
 });
