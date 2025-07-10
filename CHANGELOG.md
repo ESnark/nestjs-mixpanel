@@ -1,5 +1,12 @@
 # nestjs-mixpanel
 
+## 1.4.0
+
+### Minor Changes
+
+- 91a2e7d: Add cookie-based user identification strategy
+  - Add support for extracting user ID from cookies via new `cookie` option
+
 ## 1.3.0
 
 ### Minor Changes
