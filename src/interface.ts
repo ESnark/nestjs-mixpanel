@@ -9,6 +9,7 @@ export type MixpanelModuleOptions =
   | { token: MixpanelProjectToken; initConfig?: InitConfig; header: string }
   | { token: MixpanelProjectToken; initConfig?: InitConfig; session: string }
   | { token: MixpanelProjectToken; initConfig?: InitConfig; user: string }
+  | { token: MixpanelProjectToken; initConfig?: InitConfig; cookie: string }
   | { token: MixpanelProjectToken; initConfig?: InitConfig };
 
 export type MixpanelModuleAsyncOptions = {

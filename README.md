@@ -59,7 +59,19 @@ export class AnalyticsService {
 
 The module provides multiple strategies to automatically identify users:
 
-#### 1. Header-based Identification
+
+#### 1. AsyncStorage Context ID (Default)
+
+If no identification strategy is specified, the module will use a unique ID from the AsyncLocalStorage context:
+
+```typescript
+MixpanelModule.forRoot({
+  token: 'YOUR_MIXPANEL_TOKEN',
+  // Will use AsyncLocalStorage context ID as distinct_id
+})
+```
+
+#### 2. Header-based Identification
 
 Extract user ID from HTTP headers:
 
@@ -70,7 +82,7 @@ MixpanelModule.forRoot({
 })
 ```
 
-#### 2. Session-based Identification
+#### 3. Session-based Identification
 
 Extract user ID from session object using dot notation:
 
@@ -81,7 +93,7 @@ MixpanelModule.forRoot({
 })
 ```
 
-#### 3. User Object-based Identification
+#### 4. User Object-based Identification
 
 Extract user ID from user object using dot notation:
 
@@ -92,14 +104,21 @@ MixpanelModule.forRoot({
 })
 ```
 
-#### 4. AsyncStorage Context ID (Default)
+#### 5. Cookie-based Identification
 
-If no identification strategy is specified, the module will use a unique ID from the AsyncLocalStorage context:
+Extract user ID from cookies (requires cookie-parser):
 
 ```typescript
+// First, install and configure cookie-parser in your application
+
+// main.ts
+import cookieParser from 'cookie-parser';
+app.use(cookieParser());
+
+// Then configure MixpanelModule
 MixpanelModule.forRoot({
   token: 'YOUR_MIXPANEL_TOKEN',
-  // Will use AsyncLocalStorage context ID as distinct_id
+  cookie: 'userId', // Will extract from req.cookies.userId
 })
 ```
 

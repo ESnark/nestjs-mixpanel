@@ -53,6 +53,11 @@ export class AsyncStorageService {
     return request?.session;
   }
 
+  getCookie(name: string): string | undefined {
+    const request = this.getRequest();
+    return request?.cookies?.[name];
+  }
+
   run<T>(callback: () => T, contextId?: string): T {
     const context: AsyncStorageContext = {
       id: contextId || randomUUID(),

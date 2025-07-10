@@ -69,6 +69,9 @@ export class MixpanelService {
       } else if ('user' in this.options) {
         const user = this.asyncStorage.getUser();
         userId = this.extractValue(this.options.user, user);
+      } else if ('cookie' in this.options) {
+        const cookie = this.asyncStorage.getCookie(this.options.cookie);
+        userId = this.extractValue(this.options.cookie, cookie);
       }
 
       // Fallback to AsyncStorage context ID if no specific field is configured or extraction failed
