@@ -5,11 +5,11 @@ import type { InitConfig } from 'mixpanel';
  */
 type MixpanelProjectToken = string;
 
-export type MixpanelModuleOptions = 
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; header: string; }
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; session: string; }
+export type MixpanelModuleOptions =
+  | { token: MixpanelProjectToken; initConfig?: InitConfig; header: string }
+  | { token: MixpanelProjectToken; initConfig?: InitConfig; session: string }
   | { token: MixpanelProjectToken; initConfig?: InitConfig; user: string }
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; };
+  | { token: MixpanelProjectToken; initConfig?: InitConfig };
 
 export type MixpanelModuleAsyncOptions = {
   useFactory: (...args: any[]) => MixpanelModuleOptions | Promise<MixpanelModuleOptions>;

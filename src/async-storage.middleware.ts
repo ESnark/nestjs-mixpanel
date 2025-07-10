@@ -8,7 +8,7 @@ import { REQUEST_CTX_KEY } from './constant.js';
 export class AsyncStorageMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const asyncLocalStorage = AsyncStorageService.getAsyncLocalStorage();
-    
+
     const context = {
       id: randomUUID(),
       [REQUEST_CTX_KEY]: req,

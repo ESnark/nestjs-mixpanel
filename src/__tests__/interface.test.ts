@@ -25,7 +25,7 @@ describe('MixpanelModuleOptions Type Tests', () => {
       const headerOption: MixpanelModuleOptions = { token, header: 'test' };
       const sessionOption: MixpanelModuleOptions = { token, session: 'test' };
       const userOption: MixpanelModuleOptions = { token, user: 'test' };
-      
+
       expect(headerOption).toBeDefined();
       expect(sessionOption).toBeDefined();
       expect(userOption).toBeDefined();
@@ -34,13 +34,13 @@ describe('MixpanelModuleOptions Type Tests', () => {
     // These tests verify that the union type works correctly
     it('should allow switching between option types', () => {
       let options: MixpanelModuleOptions;
-      
+
       options = { token, header: 'X-User-ID' };
       expect(options.header).toBe('X-User-ID');
-      
+
       options = { token, session: 'user.session' };
       expect(options.session).toBe('user.session');
-      
+
       options = { token, user: 'user.id' };
       expect(options.user).toBe('user.id');
     });
@@ -51,7 +51,7 @@ describe('MixpanelModuleOptions Type Tests', () => {
       const asyncOptions: MixpanelModuleAsyncOptions = {
         useFactory: () => ({ token, header: 'X-User-ID' }),
       };
-      
+
       const result = asyncOptions.useFactory();
       expect(result).toEqual({ token, header: 'X-User-ID' });
     });
@@ -60,17 +60,17 @@ describe('MixpanelModuleOptions Type Tests', () => {
       const asyncOptions: MixpanelModuleAsyncOptions = {
         useFactory: async () => ({ token, session: 'user.session' }),
       };
-      
+
       const result = await asyncOptions.useFactory();
       expect(result).toEqual({ token, session: 'user.session' });
     });
 
     it('should accept inject array', () => {
       const asyncOptions: MixpanelModuleAsyncOptions = {
-        useFactory: (configService: any) => ({ token, user: 'user.id' }),
+        useFactory: (_configService: any) => ({ token, user: 'user.id' }),
         inject: ['ConfigService'],
       };
-      
+
       expect(asyncOptions.inject).toEqual(['ConfigService']);
     });
 
@@ -78,7 +78,7 @@ describe('MixpanelModuleOptions Type Tests', () => {
       const asyncOptions: MixpanelModuleAsyncOptions = {
         useFactory: () => ({ token, header: 'X-User-ID' }),
       };
-      
+
       expect(asyncOptions.inject).toBeUndefined();
     });
   });
@@ -89,16 +89,16 @@ describe('MixpanelModuleOptions Type Tests', () => {
       const options1: MixpanelModuleOptions = { token, header: 'test' };
       const options2: MixpanelModuleOptions = { token, session: 'test' };
       const options3: MixpanelModuleOptions = { token, user: 'test' };
-      
+
       // These should have the expected properties
       expect('header' in options1).toBe(true);
       expect('header' in options2).toBe(false);
       expect('header' in options3).toBe(false);
-      
+
       expect('session' in options1).toBe(false);
       expect('session' in options2).toBe(true);
       expect('session' in options3).toBe(false);
-      
+
       expect('user' in options1).toBe(false);
       expect('user' in options2).toBe(false);
       expect('user' in options3).toBe(true);

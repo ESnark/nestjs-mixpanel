@@ -9,9 +9,9 @@ describe('MixpanelModule', () => {
   describe('forRoot', () => {
     it('should create module with header option', async () => {
       const options: MixpanelModuleOptions = { token: 'test', header: 'X-User-ID' };
-      
+
       const moduleRef = MixpanelModule.forRoot(options);
-      
+
       expect(moduleRef.module).toBe(MixpanelModule);
       expect(moduleRef.global).toBe(true);
       expect(moduleRef.providers).toHaveLength(3);
@@ -25,9 +25,9 @@ describe('MixpanelModule', () => {
 
     it('should create module with session option', async () => {
       const options: MixpanelModuleOptions = { token: 'test', session: 'user.session' };
-      
+
       const moduleRef = MixpanelModule.forRoot(options);
-      
+
       expect(moduleRef.providers?.[0]).toEqual({
         provide: 'MIXPANEL_OPTIONS',
         useValue: options,
@@ -36,9 +36,9 @@ describe('MixpanelModule', () => {
 
     it('should create module with user option', async () => {
       const options: MixpanelModuleOptions = { token: 'test', user: 'user.id' };
-      
+
       const moduleRef = MixpanelModule.forRoot(options);
-      
+
       expect(moduleRef.providers?.[0]).toEqual({
         provide: 'MIXPANEL_OPTIONS',
         useValue: options,
@@ -48,11 +48,11 @@ describe('MixpanelModule', () => {
     it('should make module available in the application', async () => {
       const options: MixpanelModuleOptions = { token: 'test-token', header: 'X-User-ID' };
       const dynamicModule = MixpanelModule.forRoot(options);
-      
+
       const module: TestingModule = await Test.createTestingModule({
         imports: [dynamicModule],
       }).compile();
-      
+
       const service = module.get<MixpanelService>(MixpanelService);
       expect(service).toBeDefined();
       expect(service).toBeInstanceOf(MixpanelService);
@@ -66,9 +66,9 @@ describe('MixpanelModule', () => {
         useFactory: () => mockOptions,
         inject: [],
       };
-      
+
       const moduleRef = MixpanelModule.forRootAsync(options);
-      
+
       expect(moduleRef.module).toBe(MixpanelModule);
       expect(moduleRef.global).toBe(true);
       expect(moduleRef.providers).toHaveLength(3);
@@ -84,12 +84,12 @@ describe('MixpanelModule', () => {
     it('should create module with useFactory and inject dependencies', async () => {
       const mockOptions: MixpanelModuleOptions = { token: 'test', user: 'user.id' };
       const options: MixpanelModuleAsyncOptions = {
-        useFactory: (configService: any) => mockOptions,
+        useFactory: (_configService: any) => mockOptions,
         inject: ['ConfigService'],
       };
-      
+
       const moduleRef = MixpanelModule.forRootAsync(options);
-      
+
       expect(moduleRef.providers?.[0]).toEqual({
         provide: 'MIXPANEL_OPTIONS',
         useFactory: options.useFactory,
@@ -102,11 +102,11 @@ describe('MixpanelModule', () => {
       const dynamicModule = MixpanelModule.forRootAsync({
         useFactory: () => mockOptions,
       });
-      
+
       const module: TestingModule = await Test.createTestingModule({
         imports: [dynamicModule],
       }).compile();
-      
+
       const service = module.get<MixpanelService>(MixpanelService);
       expect(service).toBeDefined();
       expect(service).toBeInstanceOf(MixpanelService);

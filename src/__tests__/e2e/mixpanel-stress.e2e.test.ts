@@ -4,7 +4,7 @@ import { INestApplication, Controller, Post, Module } from '@nestjs/common';
 import request from 'supertest';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { Inject } from '@nestjs/common';
 
 // Mock mixpanel
@@ -20,13 +20,11 @@ vi.mock('mixpanel', () => ({
 // Test controller
 @Controller('test')
 class TestController {
-  constructor(
-    @Inject(MixpanelService) private readonly mixpanelService: MixpanelService
-  ) {}
+  constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
 
   @Post('track')
   async track() {
-    await new Promise(resolve => setTimeout(resolve, 5)); // Small delay to simulate real processing
+    await new Promise((resolve) => setTimeout(resolve, 5)); // Small delay to simulate real processing
     this.mixpanelService.track('test-event', { action: 'stress-test' });
     return { success: true };
   }
@@ -59,12 +57,12 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     // Set keep-alive timeout to prevent ECONNRESET
     const server = app.getHttpServer();
     server.keepAliveTimeout = 120000; // 2 minutes
     server.headersTimeout = 120000; // 2 minutes
-    
+
     await app.init();
   });
 
@@ -87,7 +85,7 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
 
     // Make sequential requests
     const requestCount = 1000;
-    
+
     for (let i = 0; i < requestCount; i++) {
       try {
         await request(app.getHttpServer())
@@ -96,12 +94,15 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
           .set('Connection', 'close') // Force connection close to avoid ECONNRESET
           .expect(201);
       } catch (error) {
-        console.error(`Request ${i} failed:`, error instanceof Error ? error.message : 'Unknown error');
+        console.error(
+          `Request ${i} failed:`,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
         throw error;
       }
     }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     // Force garbage collection if available
     if (global.gc) {
       global.gc();
@@ -115,7 +116,7 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
     // Memory increase per request should be reasonable for E2E test environment
     console.log(`Memory increase per request: ${memoryIncreasePerRequest / 1024}KB`);
     console.log(`Total memory increase: ${memoryIncrease / 1024 / 1024}MB`);
-    
+
     // In E2E test environment with NestJS app and supertest overhead,
     // 200KB per request is reasonable. In production, this would be much lower.
     expect(memoryIncreasePerRequest).toBeLessThan(200 * 1024); // 200KB per request in test env
@@ -124,7 +125,7 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
   it('should handle concurrent requests', async () => {
     const concurrentRequests = 5; // Small number to avoid connection issues
     const allUserIds = [];
-    
+
     const promises = Array.from({ length: concurrentRequests }, (_, i) => {
       const userId = `concurrent-user-${i}`;
       allUserIds.push(userId);
@@ -134,12 +135,12 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
         .set('Connection', 'close')
         .expect(201);
     });
-    
+
     await Promise.all(promises);
 
     // Check that all events were tracked with correct user IDs
-    const trackedUserIds = mockTrack.mock.calls.map(call => call[1].distinct_id);
-    
+    const trackedUserIds = mockTrack.mock.calls.map((call) => call[1].distinct_id);
+
     expect(trackedUserIds.sort()).toEqual(allUserIds.sort());
   });
 
@@ -152,13 +153,13 @@ describe('MixpanelModule Stress Tests', { timeout: 120000 }, () => {
         .post('/test/extract-user-id')
         .set('Connection', 'close')
         .expect(201);
-      
+
       if (response.body.userId) {
         userIds.add(response.body.userId);
       }
-      
+
       // Wait between requests
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     // Should have unique IDs

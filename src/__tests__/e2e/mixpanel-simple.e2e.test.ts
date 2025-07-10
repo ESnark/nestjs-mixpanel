@@ -1,10 +1,19 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, Injectable, Controller, Module, Get, Inject, CanActivate, ExecutionContext, UseGuards } from '@nestjs/common';
+import {
+  INestApplication,
+  Injectable,
+  Controller,
+  Module,
+  Get,
+  Inject,
+  CanActivate,
+  ExecutionContext,
+  UseGuards,
+} from '@nestjs/common';
 import request from 'supertest';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
-import { AsyncStorageService } from '../../async-storage.service.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock mixpanel
@@ -251,9 +260,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
     await app.init();
 
     // Test CLS ID fallback
-    const response = await request(app.getHttpServer())
-      .get('/test/user-id')
-      .expect(200);
+    const response = await request(app.getHttpServer()).get('/test/user-id').expect(200);
 
     expect(response.body.userId).toBeDefined();
     expect(response.body.userId).toMatch(/^[a-zA-Z0-9-]+$/); // CLS generates UUID-like IDs
@@ -295,7 +302,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
       for (let i = 0; i < 100; i++) {
         const userId = `user-${i}`;
         userIds.push(userId);
-        
+
         try {
           await request(app.getHttpServer())
             .get('/test/track')
@@ -303,20 +310,23 @@ describe('MixpanelModule Simple E2E Tests', () => {
             .set('Connection', 'close')
             .expect(200);
         } catch (error) {
-          console.error(`Request ${i} failed:`, error instanceof Error ? error.message : 'Unknown error');
+          console.error(
+            `Request ${i} failed:`,
+            error instanceof Error ? error.message : 'Unknown error',
+          );
           throw error;
         }
-        
+
         // Small delay to prevent connection issues
         if (i % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
         }
       }
 
       // Verify each request had unique user ID
       const trackedCalls = mockTrack.mock.calls;
-      const trackedUserIds = trackedCalls.map(call => call[1].distinct_id);
-      
+      const trackedUserIds = trackedCalls.map((call) => call[1].distinct_id);
+
       expect(new Set(trackedUserIds).size).toBe(100);
       expect(trackedUserIds).toEqual(userIds);
     });

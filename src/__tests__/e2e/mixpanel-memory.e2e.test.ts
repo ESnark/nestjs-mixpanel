@@ -20,9 +20,7 @@ vi.mock('mixpanel', () => ({
 // Test controller
 @Controller('test')
 class TestController {
-  constructor(
-    @Inject(MixpanelService) private readonly mixpanelService: MixpanelService
-  ) {}
+  constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
 
   @Post('track')
   track() {
@@ -48,7 +46,7 @@ describe('MixpanelModule Memory Leak Detection', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [TestModule],
     }).compile();
@@ -72,7 +70,7 @@ describe('MixpanelModule Memory Leak Detection', () => {
     if (global.gc) {
       global.gc();
     }
-    
+
     // Warmup requests
     for (let i = 0; i < 10; i++) {
       await request(app.getHttpServer())
@@ -83,17 +81,17 @@ describe('MixpanelModule Memory Leak Detection', () => {
     }
 
     // Wait and GC
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     if (global.gc) {
       global.gc();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       global.gc();
     }
 
     // Measure memory after each batch
     for (let batch = 0; batch < numberOfBatches; batch++) {
       const beforeBatch = process.memoryUsage().heapUsed;
-      
+
       for (let i = 0; i < batchSize; i++) {
         await request(app.getHttpServer())
           .post('/test/track')
@@ -103,33 +101,38 @@ describe('MixpanelModule Memory Leak Detection', () => {
       }
 
       // Wait for async operations to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       // Force GC
       if (global.gc) {
         global.gc();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
         global.gc();
       }
 
       const afterBatch = process.memoryUsage().heapUsed;
       const increase = afterBatch - beforeBatch;
-      
+
       measurements.push({
         batch: batch + 1,
         increase: increase / 1024 / 1024, // MB
-        increasePerRequest: increase / batchSize / 1024 // KB
+        increasePerRequest: increase / batchSize / 1024, // KB
       });
 
-      console.log(`Batch ${batch + 1}: ${(increase / 1024 / 1024).toFixed(2)}MB increase, ${(increase / batchSize / 1024).toFixed(2)}KB per request`);
+      console.log(
+        `Batch ${batch + 1}: ${(increase / 1024 / 1024).toFixed(2)}MB increase, ${(increase / batchSize / 1024).toFixed(2)}KB per request`,
+      );
     }
 
     // Check if memory increase is stabilizing
     const lastThreeBatches = measurements.slice(-3);
-    const avgIncreasePerRequest = lastThreeBatches.reduce((sum, m) => sum + m.increasePerRequest, 0) / 3;
-    
-    console.log(`\nAverage increase per request (last 3 batches): ${avgIncreasePerRequest.toFixed(2)}KB`);
-    
+    const avgIncreasePerRequest =
+      lastThreeBatches.reduce((sum, m) => sum + m.increasePerRequest, 0) / 3;
+
+    console.log(
+      `\nAverage increase per request (last 3 batches): ${avgIncreasePerRequest.toFixed(2)}KB`,
+    );
+
     // Memory increase should stabilize (not grow linearly)
     expect(avgIncreasePerRequest).toBeLessThan(50); // 50KB per request after stabilization
   }, 120000); // 2 minute timeout

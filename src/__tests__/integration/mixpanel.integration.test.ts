@@ -48,8 +48,8 @@ describe('MixpanelModule Integration Tests', () => {
       const testContext = {
         id: 'test-context-id',
         [REQUEST_CTX_KEY]: {
-          headers: { 'x-user-id': 'header-user-123' }
-        }
+          headers: { 'x-user-id': 'header-user-123' },
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -61,8 +61,8 @@ describe('MixpanelModule Integration Tests', () => {
       const testContext = {
         id: 'test-context-id',
         [REQUEST_CTX_KEY]: {
-          headers: { 'x-user-id': 'header-user-456' }
-        }
+          headers: { 'x-user-id': 'header-user-456' },
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -78,8 +78,8 @@ describe('MixpanelModule Integration Tests', () => {
       const testContext = {
         id: 'cls-fallback-id',
         [REQUEST_CTX_KEY]: {
-          headers: {}
-        }
+          headers: {},
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -113,7 +113,7 @@ describe('MixpanelModule Integration Tests', () => {
               id: 'session-user-789',
             },
           },
-        }
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -131,7 +131,7 @@ describe('MixpanelModule Integration Tests', () => {
               id: 'nested-session-id',
             },
           },
-        }
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -149,7 +149,7 @@ describe('MixpanelModule Integration Tests', () => {
         id: 'cls-session-fallback',
         [REQUEST_CTX_KEY]: {
           session: null,
-        }
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -183,7 +183,7 @@ describe('MixpanelModule Integration Tests', () => {
               userId: 'user-profile-111',
             },
           },
-        }
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -201,7 +201,7 @@ describe('MixpanelModule Integration Tests', () => {
               userId: 'user-profile-222',
             },
           },
-        }
+        },
       };
 
       asyncStorageService.enterWith(testContext);
@@ -231,7 +231,7 @@ describe('MixpanelModule Integration Tests', () => {
     it('should use AsyncStorage context ID when no extraction option is configured', () => {
       const testContext = {
         id: 'default-context-id',
-        [REQUEST_CTX_KEY]: {}
+        [REQUEST_CTX_KEY]: {},
       };
 
       asyncStorageService.enterWith(testContext);
@@ -242,7 +242,7 @@ describe('MixpanelModule Integration Tests', () => {
     it('should track events with AsyncStorage context ID', () => {
       const testContext = {
         id: 'context-track-id',
-        [REQUEST_CTX_KEY]: {}
+        [REQUEST_CTX_KEY]: {},
       };
 
       asyncStorageService.enterWith(testContext);
@@ -275,8 +275,8 @@ describe('MixpanelModule Integration Tests', () => {
       const testContext1 = {
         id: 'context-1',
         [REQUEST_CTX_KEY]: {
-          headers: { 'x-user-id': 'user-1' }
-        }
+          headers: { 'x-user-id': 'user-1' },
+        },
       };
 
       asyncStorageService.enterWith(testContext1);
@@ -287,8 +287,8 @@ describe('MixpanelModule Integration Tests', () => {
       const testContext2 = {
         id: 'context-2',
         [REQUEST_CTX_KEY]: {
-          headers: { 'x-user-id': 'user-2' }
-        }
+          headers: { 'x-user-id': 'user-2' },
+        },
       };
 
       asyncStorageService.enterWith(testContext2);

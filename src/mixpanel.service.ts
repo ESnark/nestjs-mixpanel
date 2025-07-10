@@ -10,7 +10,7 @@ export class MixpanelService {
 
   constructor(
     @Inject(MIXPANEL_OPTIONS) private readonly options: MixpanelModuleOptions,
-    @Inject(AsyncStorageService) private readonly asyncStorage: AsyncStorageService
+    @Inject(AsyncStorageService) private readonly asyncStorage: AsyncStorageService,
   ) {
     this.mixpanel = Mixpanel.init(this.options.token, this.options.initConfig);
   }
@@ -21,14 +21,14 @@ export class MixpanelService {
       ...(userId && { distinct_id: userId }),
       ...properties,
     };
-    
+
     this.mixpanel.track(event, finalProperties);
   }
 
   extractUserId(): string | undefined {
     try {
       let userId: string | undefined;
-      
+
       if ('header' in this.options) {
         const request = this.asyncStorage.getRequest();
         userId = request?.headers?.[this.options.header.toLowerCase()];
@@ -39,13 +39,13 @@ export class MixpanelService {
         const user = this.asyncStorage.getUser();
         userId = this.extractValue(this.options.user, user);
       }
-      
+
       // Fallback to AsyncStorage context ID if no specific field is configured or extraction failed
       return userId || this.asyncStorage.getId();
     } catch (error) {
       console.warn('Failed to extract user ID from request:', error);
     }
-    
+
     return undefined;
   }
 

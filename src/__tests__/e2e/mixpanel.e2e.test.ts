@@ -1,6 +1,16 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, Controller, Post, Module, Inject, Injectable, CanActivate, ExecutionContext, UseGuards } from '@nestjs/common';
+import {
+  INestApplication,
+  Controller,
+  Post,
+  Module,
+  Inject,
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UseGuards,
+} from '@nestjs/common';
 import request from 'supertest';
 import { MixpanelModule } from '../../mixpanel.module.js';
 import { MixpanelService } from '../../mixpanel.service.js';
@@ -19,9 +29,7 @@ vi.mock('mixpanel', () => ({
 // Test controller
 @Controller()
 class TestController {
-  constructor(
-    @Inject(MixpanelService) private readonly mixpanelService: MixpanelService
-  ) {
+  constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {
     console.log('TestController created with mixpanelService:', mixpanelService);
   }
 
@@ -69,7 +77,7 @@ describe('MixpanelModule E2E Tests', () => {
   describe('Header extraction', () => {
     beforeEach(async () => {
       const TestModule = createTestModule({ header: 'x-user-id' });
-      
+
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [TestModule],
       }).compile();
@@ -88,10 +96,7 @@ describe('MixpanelModule E2E Tests', () => {
     });
 
     it('should track event with user ID from header', async () => {
-      await request(app.getHttpServer())
-        .post('/track')
-        .set('x-user-id', 'user-456')
-        .expect(201);
+      await request(app.getHttpServer()).post('/track').set('x-user-id', 'user-456').expect(201);
 
       expect(mockTrack).toHaveBeenCalledWith('test-event', {
         action: 'e2e-test',
@@ -100,9 +105,7 @@ describe('MixpanelModule E2E Tests', () => {
     });
 
     it('should fallback to AsyncStorage context ID when header is missing', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/extract-user-id')
-        .expect(201);
+      const response = await request(app.getHttpServer()).post('/extract-user-id').expect(201);
 
       expect(response.body.userId).toBeDefined();
       expect(response.body.userId).toMatch(/^[a-zA-Z0-9-]+$/); // AsyncStorage generates UUID-like IDs
@@ -141,7 +144,10 @@ describe('MixpanelModule E2E Tests', () => {
 
         @Post('extract-user-id')
         extractUserId() {
-          console.log('extractUserId called in session test, mixpanelService:', this.mixpanelService);
+          console.log(
+            'extractUserId called in session test, mixpanelService:',
+            this.mixpanelService,
+          );
           const userId = this.mixpanelService.extractUserId();
           return { userId };
         }
@@ -189,9 +195,7 @@ describe('MixpanelModule E2E Tests', () => {
     });
 
     it('should handle nested session paths', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/extract-user-id')
-        .expect(201);
+      const response = await request(app.getHttpServer()).post('/extract-user-id').expect(201);
 
       expect(response.body).toEqual({ userId: 'session-default-123' });
     });
@@ -280,7 +284,7 @@ describe('MixpanelModule E2E Tests', () => {
   describe('AsyncStorage Context', () => {
     it('should properly clean up AsyncStorage context', async () => {
       const TestModule = createTestModule({});
-      
+
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [TestModule],
       }).compile();
@@ -293,16 +297,14 @@ describe('MixpanelModule E2E Tests', () => {
       // Make multiple requests and collect AsyncStorage IDs
       // Use sequential requests with small delays to ensure different AsyncStorage contexts
       for (let i = 0; i < 10; i++) {
-        const response = await request(app.getHttpServer())
-          .post('/extract-user-id')
-          .expect(201);
-        
+        const response = await request(app.getHttpServer()).post('/extract-user-id').expect(201);
+
         if (response.body.userId) {
           userIds.add(response.body.userId);
         }
-        
+
         // Small delay to ensure different AsyncStorage contexts
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
       // All requests should have different AsyncStorage IDs

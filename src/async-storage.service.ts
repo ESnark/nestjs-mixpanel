@@ -21,7 +21,7 @@ export class AsyncStorageService {
     const store = AsyncStorageService.storage.getStore();
     return store?.[key] as T;
   }
-  
+
   getStore(): AsyncStorageContext | undefined {
     return AsyncStorageService.storage.getStore();
   }
