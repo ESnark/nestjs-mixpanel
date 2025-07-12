@@ -8,7 +8,6 @@ A powerful NestJS module for seamless Mixpanel analytics integration with automa
 - **Flexible User Identification** - Multiple strategies for automatic user tracking
 - **Request Context Management** - Built-in AsyncLocalStorage for request isolation
 - **Dynamic Data Access** - Real-time access to request, session, and user data
-- **Full Mixpanel API** - Access to complete Mixpanel functionality
 - **TypeScript Support** - Fully typed with TypeScript definitions
 - **Well Tested** - Comprehensive test suite with unit, integration, and e2e tests
 
@@ -122,6 +121,26 @@ MixpanelModule.forRoot({
 })
 ```
 
+### Additional Configuration
+
+#### IP Address Tracking
+
+The module can automatically extract client IP addresses from request headers for geolocation:
+
+```typescript
+MixpanelModule.forRoot({
+  token: 'YOUR_MIXPANEL_TOKEN',
+  ipHeader: 'X-Forwarded-For', // Default, can also use 'X-Real-IP' or 'Forwarded'
+})
+```
+
+Supported headers:
+- `X-Forwarded-For` (default) - Standard proxy header, uses the first IP if multiple
+- `X-Real-IP` - Common nginx header
+- `Forwarded` - RFC 7239 standard header
+
+The IP address is automatically included in all track events and profile updates for geolocation data.
+
 ## API Reference
 
 ### MixpanelService
@@ -153,8 +172,8 @@ this.mixpanel.track('purchase_completed', {
 
 The `distinct_id` is automatically set based on your configured identification strategy.
 
-#### `people.set(distinctId: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
-#### `people.set(properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
+#### `people.set(distinctId: string, properties: Mixpanel.PropertyDict, modifiers?: Mixpanel.Modifiers, callback?: Mixpanel.Callback): void`
+#### `people.set(properties: Mixpanel.PropertyDict, modifiers?: Mixpanel.Modifiers, callback?: Mixpanel.Callback): void`
 
 Sets properties on a user profile. Can be called with or without a specific user ID.
 
@@ -179,10 +198,19 @@ this.mixpanel.people.set({
 }, (err) => {
   if (err) console.error('Failed to set properties:', err);
 });
+
+// With modifiers (e.g., custom IP or location)
+this.mixpanel.people.set({
+  name: 'John Doe',
+}, {
+  $ip: '192.168.1.1',
+  $latitude: 40.7128,
+  $longitude: -74.0060,
+});
 ```
 
-#### `people.setOnce(distinctId: string, properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
-#### `people.setOnce(properties: Mixpanel.PropertyDict, callback?: Mixpanel.Callback): void`
+#### `people.setOnce(distinctId: string, properties: Mixpanel.PropertyDict, modifiers?: Mixpanel.Modifiers, callback?: Mixpanel.Callback): void`
+#### `people.setOnce(properties: Mixpanel.PropertyDict, modifiers?: Mixpanel.Modifiers, callback?: Mixpanel.Callback): void`
 
 Sets properties on a user profile only if they are not already set.
 
@@ -203,6 +231,13 @@ this.mixpanel.people.setOnce({
   created_at: new Date().toISOString(),
 }, (err) => {
   if (err) console.error('Failed to set properties:', err);
+});
+
+// With modifiers
+this.mixpanel.people.setOnce({
+  created_at: new Date().toISOString(),
+}, {
+  $ignore_time: true,
 });
 ```
 

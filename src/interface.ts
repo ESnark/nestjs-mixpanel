@@ -5,12 +5,20 @@ import type { InitConfig } from 'mixpanel';
  */
 type MixpanelProjectToken = string;
 
+type IpHeaderOption = 'X-Forwarded-For' | 'X-Real-IP' | 'Forwarded';
+
+type CommonModuleOptions = {
+  token: MixpanelProjectToken;
+  initConfig?: InitConfig;
+  ipHeader?: IpHeaderOption;
+};
+
 export type MixpanelModuleOptions =
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; header: string }
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; session: string }
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; user: string }
-  | { token: MixpanelProjectToken; initConfig?: InitConfig; cookie: string }
-  | { token: MixpanelProjectToken; initConfig?: InitConfig };
+  | (CommonModuleOptions & { header: string })
+  | (CommonModuleOptions & { session: string })
+  | (CommonModuleOptions & { user: string })
+  | (CommonModuleOptions & { cookie: string })
+  | CommonModuleOptions;
 
 export type MixpanelModuleAsyncOptions = {
   useFactory: (...args: any[]) => MixpanelModuleOptions | Promise<MixpanelModuleOptions>;
