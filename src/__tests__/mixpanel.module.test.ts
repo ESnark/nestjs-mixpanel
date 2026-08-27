@@ -3,7 +3,15 @@ import { MixpanelModule } from '../mixpanel.module.js';
 import { MixpanelService } from '../mixpanel.service.js';
 import { AsyncStorageService } from '../async-storage.service.js';
 import { MixpanelModuleOptions, MixpanelModuleAsyncOptions } from '../interface.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+
+// mixpanel@0.23.0 crashes on init when HTTP(S)_PROXY is set (it news the
+// https-proxy-agent v7 module namespace instead of its named export), so
+// clear proxy variables for the un-mocked init calls in this file.
+beforeAll(() => {
+  delete process.env.HTTPS_PROXY;
+  delete process.env.HTTP_PROXY;
+});
 
 describe('MixpanelModule', () => {
   describe('forRoot', () => {

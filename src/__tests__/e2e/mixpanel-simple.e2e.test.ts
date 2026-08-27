@@ -231,7 +231,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
     expect(response.body.userId).toBe('user-object-111');
   });
 
-  it('should fallback to AsyncStorage context ID when no option is configured', async () => {
+  it('should use the request context ID when fallback is request-context', async () => {
     @Controller('test')
     class TestController {
       constructor(@Inject(MixpanelService) private readonly mixpanelService: MixpanelService) {}
@@ -246,6 +246,7 @@ describe('MixpanelModule Simple E2E Tests', () => {
       imports: [
         MixpanelModule.forRoot({
           token: 'test-token',
+          fallback: 'request-context',
         }),
       ],
       controllers: [TestController],

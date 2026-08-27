@@ -42,6 +42,7 @@ class TestController {
     MixpanelModule.forRoot({
       token: 'test-token',
       header: 'x-user-id',
+      fallback: 'request-context',
     }),
   ],
   controllers: [TestController],

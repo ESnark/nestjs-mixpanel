@@ -74,7 +74,7 @@ describe('MixpanelModule Integration Tests', () => {
       });
     });
 
-    it('should fallback to AsyncStorage ID when header is missing', () => {
+    it('should return undefined when header is missing (anonymous default)', () => {
       const testContext = {
         id: 'cls-fallback-id',
         [REQUEST_CTX_KEY]: {
@@ -84,7 +84,7 @@ describe('MixpanelModule Integration Tests', () => {
 
       asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
-      expect(userId).toBe('cls-fallback-id');
+      expect(userId).toBeUndefined();
     });
   });
 
@@ -143,7 +143,7 @@ describe('MixpanelModule Integration Tests', () => {
       });
     });
 
-    it('should fallback to AsyncStorage ID when session path is invalid', () => {
+    it('should return undefined when session path is invalid (anonymous default)', () => {
       // Use enterWith to set context
       const testContext = {
         id: 'cls-session-fallback',
@@ -154,7 +154,7 @@ describe('MixpanelModule Integration Tests', () => {
 
       asyncStorageService.enterWith(testContext);
       const userId = mixpanelService.extractUserId();
-      expect(userId).toBe('cls-session-fallback');
+      expect(userId).toBeUndefined();
     });
   });
 
@@ -214,7 +214,7 @@ describe('MixpanelModule Integration Tests', () => {
     });
   });
 
-  describe('Fallback to AsyncStorage context ID', () => {
+  describe('Anonymous default', () => {
     beforeEach(async () => {
       module = await Test.createTestingModule({
         imports: [
@@ -228,7 +228,49 @@ describe('MixpanelModule Integration Tests', () => {
       asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
     });
 
-    it('should use AsyncStorage context ID when no extraction option is configured', () => {
+    it('should return undefined when no extraction option is configured', () => {
+      const testContext = {
+        id: 'default-context-id',
+        [REQUEST_CTX_KEY]: {},
+      };
+
+      asyncStorageService.enterWith(testContext);
+      const userId = mixpanelService.extractUserId();
+      expect(userId).toBeUndefined();
+    });
+
+    it('should track events with an empty distinct_id', () => {
+      const testContext = {
+        id: 'context-track-id',
+        [REQUEST_CTX_KEY]: {},
+      };
+
+      asyncStorageService.enterWith(testContext);
+      mixpanelService.track('default-event', { type: 'test' });
+
+      expect(mockTrack).toHaveBeenCalledWith('default-event', {
+        type: 'test',
+        distinct_id: '',
+      });
+    });
+  });
+
+  describe('Fallback: request-context', () => {
+    beforeEach(async () => {
+      module = await Test.createTestingModule({
+        imports: [
+          MixpanelModule.forRoot({
+            token: 'test-token',
+            fallback: 'request-context',
+          }),
+        ],
+      }).compile();
+
+      mixpanelService = module.get<MixpanelService>(MixpanelService);
+      asyncStorageService = module.get<AsyncStorageService>(AsyncStorageService);
+    });
+
+    it('should use the AsyncStorage context ID', () => {
       const testContext = {
         id: 'default-context-id',
         [REQUEST_CTX_KEY]: {},
@@ -239,7 +281,7 @@ describe('MixpanelModule Integration Tests', () => {
       expect(userId).toBe('default-context-id');
     });
 
-    it('should track events with AsyncStorage context ID', () => {
+    it('should track events with the AsyncStorage context ID', () => {
       const testContext = {
         id: 'context-track-id',
         [REQUEST_CTX_KEY]: {},

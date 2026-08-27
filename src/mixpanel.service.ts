@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { AsyncStorageService } from './async-storage.service.js';
 import Mixpanel from 'mixpanel';
 import type { MixpanelModuleOptions } from './interface.js';
@@ -28,7 +28,9 @@ type PeopleFunction = {
 
 @Injectable()
 export class MixpanelService {
+  private readonly logger = new Logger(MixpanelService.name);
   private readonly mixpanel: Mixpanel.Mixpanel;
+  private warnedExtractionFailure = false;
 
   constructor(
     @Inject(MIXPANEL_OPTIONS) private readonly options: MixpanelModuleOptions,
@@ -41,7 +43,10 @@ export class MixpanelService {
     const userId = this.extractUserId();
     const ip = this.getIp();
     const finalProperties = {
-      ...(userId && { distinct_id: userId }),
+      // An empty distinct_id is Mixpanel's documented way to send an event
+      // that is not associated with any user, so unresolved identities do
+      // not pollute unique-user counts.
+      distinct_id: userId ?? '',
       ...(ip && { ip }),
       ...properties,
     };
@@ -93,6 +98,12 @@ export class MixpanelService {
     } else {
       // properties, modifiers?, callback?
       const userId = this.extractUserId();
+      if (!userId) {
+        this.logger.warn(
+          'Skipping people.set: no user identity could be resolved for the current context. Pass an explicit distinct ID or configure an identification strategy.',
+        );
+        return;
+      }
       const properties = arg1;
       let modifiers: Mixpanel.Modifiers;
       let callback: Mixpanel.Callback | undefined;
@@ -151,6 +162,12 @@ export class MixpanelService {
     } else {
       // properties, modifiers?, callback?
       const userId = this.extractUserId();
+      if (!userId) {
+        this.logger.warn(
+          'Skipping people.setOnce: no user identity could be resolved for the current context. Pass an explicit distinct ID or configure an identification strategy.',
+        );
+        return;
+      }
       const properties = arg1;
       let modifiers: Mixpanel.Modifiers;
       let callback: Mixpanel.Callback | undefined;
@@ -208,6 +225,7 @@ export class MixpanelService {
   extractUserId(): string | undefined {
     try {
       let userId: string | undefined;
+      let strategyConfigured = true;
 
       if ('header' in this.options) {
         const request = this.asyncStorage.getRequest();
@@ -220,14 +238,38 @@ export class MixpanelService {
         userId = this.extractValue(this.options.user, user);
       } else if ('cookie' in this.options) {
         userId = this.asyncStorage.getCookie(this.options.cookie);
+      } else {
+        strategyConfigured = false;
       }
 
-      // Fallback to AsyncStorage context ID if no specific field is configured or extraction failed
-      return userId || this.asyncStorage.getId();
+      if (userId) {
+        return userId;
+      }
+
+      if (strategyConfigured && !this.warnedExtractionFailure) {
+        this.warnedExtractionFailure = true;
+        this.logger.warn(
+          'Could not extract a user ID with the configured identification strategy; the fallback identity will be used. This is logged only once.',
+        );
+      }
+
+      return this.resolveFallbackId();
     } catch (error) {
-      console.warn('Failed to extract user ID from request:', error);
+      this.logger.warn(`Failed to extract user ID from request: ${error}`);
     }
 
+    return undefined;
+  }
+
+  private resolveFallbackId(): string | undefined {
+    const fallback = this.options.fallback ?? 'anonymous';
+
+    if (fallback === 'request-context') {
+      return this.asyncStorage.getId();
+    }
+    if (typeof fallback === 'function') {
+      return fallback(this.asyncStorage.getRequest()) || undefined;
+    }
     return undefined;
   }
 
