@@ -42,6 +42,10 @@
   ],
   "author": "ESnark<settimeout1000@gmail.com>",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ESnark/nestjs-mixpanel.git"
+  },
   "packageManager": "pnpm@10.8.0",
   "engines": {
     "node": ">=20.0.0"
