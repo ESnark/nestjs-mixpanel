@@ -47,13 +47,27 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Detect pending changesets before the action runs, so the publish gate
+      # below does not depend on the action's output names (hasChangesets was
+      # renamed to has-changesets in v2; a stale name silently skips publish).
+      - name: Check for pending changesets
+        id: pending
+        shell: bash
+        run: |
+          if find .changeset -name '*.md' ! -name 'README.md' | grep -q .; then
+            echo "changesets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changesets=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release Pull Request
         id: changesets
         uses: changesets/action@v2
         with:
-          version: pnpm changeset version
-          commit: "chore: release"
-          title: "chore: release"
+          # changesets/action v2 renamed version/commit/title to these names
+          version-script: pnpm changeset version
+          commit-message: "chore: release"
+          pr-title: "chore: release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -64,7 +78,7 @@ jobs:
       # merged) this publishes any version not yet on the registry.
       - name: Publish to npm
         id: publish
-        if: steps.changesets.outputs.hasChangesets == 'false'
+        if: steps.pending.outputs.changesets == 'false'
         shell: bash
         run: |
           pnpm changeset publish | tee publish-output.log
