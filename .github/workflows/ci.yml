@@ -44,6 +44,11 @@ jobs:
 
       - name: Test
         run: pnpm test
+        env:
+          # The memory-leak e2e test forces GC between measurements; without
+          # --expose-gc its per-request threshold is at the mercy of GC timing
+          # and fails intermittently (observed on Node 24 runners).
+          NODE_OPTIONS: --expose-gc
 
       - name: Build
         run: pnpm build
