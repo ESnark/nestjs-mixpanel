@@ -1,5 +1,8 @@
 # NestJS Mixpanel
 
+[![npm version](https://img.shields.io/npm/v/nestjs-mixpanel.svg)](https://www.npmjs.com/package/nestjs-mixpanel)
+[![CI](https://github.com/ESnark/nestjs-mixpanel/actions/workflows/ci.yml/badge.svg)](https://github.com/ESnark/nestjs-mixpanel/actions/workflows/ci.yml)
+
 A powerful NestJS module for seamless Mixpanel analytics integration with automatic user identification and request context management.
 
 ## Features
@@ -256,6 +259,19 @@ this.mixpanel.people.setOnce({
 }, {
   $ignore_time: true,
 });
+```
+
+#### `client: Mixpanel.Mixpanel`
+
+The underlying [mixpanel-node](https://github.com/mixpanel/mixpanel-node) instance, for APIs this module does not wrap (batch tracking, groups, `people.increment`, imports, ...). Calls made directly on the client bypass automatic user identification and IP resolution — pass `distinct_id` and modifiers yourself:
+
+```typescript
+this.mixpanel.client.track_batch([
+  { event: 'signup', properties: { distinct_id: 'user-123' } },
+  { event: 'first_login', properties: { distinct_id: 'user-123' } },
+]);
+
+this.mixpanel.client.people.increment('user-123', 'login_count');
 ```
 
 #### `extractUserId(): string | undefined`
