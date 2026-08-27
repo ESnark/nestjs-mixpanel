@@ -6,9 +6,25 @@ import { MIXPANEL_OPTIONS } from './constant.js';
 
 type TrackFunction = (
   event: string,
-  properties: Mixpanel.PropertyDict,
+  properties?: Mixpanel.PropertyDict,
   callback?: Mixpanel.Callback,
 ) => void;
+
+type PeopleFunction = {
+  (
+    distinctId: string,
+    properties: Mixpanel.PropertyDict,
+    modifiers?: Mixpanel.Modifiers,
+    callback?: Mixpanel.Callback,
+  ): void;
+  (distinctId: string, properties: Mixpanel.PropertyDict, callback: Mixpanel.Callback): void;
+  (
+    properties: Mixpanel.PropertyDict,
+    modifiers?: Mixpanel.Modifiers,
+    callback?: Mixpanel.Callback,
+  ): void;
+  (properties: Mixpanel.PropertyDict, callback: Mixpanel.Callback): void;
+};
 
 @Injectable()
 export class MixpanelService {
@@ -30,7 +46,11 @@ export class MixpanelService {
       ...properties,
     };
 
-    this.mixpanel.track(event, finalProperties, callback);
+    if (callback) {
+      this.mixpanel.track(event, finalProperties, callback);
+    } else {
+      this.mixpanel.track(event, finalProperties);
+    }
   };
 
   private peopleSet(
@@ -149,10 +169,10 @@ export class MixpanelService {
     }
   }
 
-  get people() {
+  get people(): { set: PeopleFunction; setOnce: PeopleFunction } {
     return {
-      set: this.peopleSet,
-      setOnce: this.peopleSetOnce,
+      set: this.peopleSet.bind(this) as PeopleFunction,
+      setOnce: this.peopleSetOnce.bind(this) as PeopleFunction,
     };
   }
 
@@ -199,8 +219,7 @@ export class MixpanelService {
         const user = this.asyncStorage.getUser();
         userId = this.extractValue(this.options.user, user);
       } else if ('cookie' in this.options) {
-        const cookie = this.asyncStorage.getCookie(this.options.cookie);
-        userId = this.extractValue(this.options.cookie, cookie);
+        userId = this.asyncStorage.getCookie(this.options.cookie);
       }
 
       // Fallback to AsyncStorage context ID if no specific field is configured or extraction failed
