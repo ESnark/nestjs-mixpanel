@@ -18,9 +18,7 @@ type IpHeaderOption = 'X-Forwarded-For' | 'X-Real-IP' | 'Forwarded';
  *   `undefined` to fall back to anonymous
  */
 export type FallbackIdStrategy =
-  | 'anonymous'
-  | 'request-context'
-  | ((request: unknown) => string | undefined);
+  'anonymous' | 'request-context' | ((request: unknown) => string | undefined);
 
 type CommonModuleOptions = {
   token: MixpanelProjectToken;
