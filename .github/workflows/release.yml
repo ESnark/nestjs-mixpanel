@@ -34,10 +34,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # @changesets/cli v3 requires Node >= 22.8 (it calls
+          # module.enableCompileCache unconditionally).
+          node-version: 24
           cache: 'pnpm'
 
-      # Trusted publishing requires npm >= 11.5.1; Node 20 bundles npm 10.
+      # Trusted publishing requires npm >= 11.5.1.
       - name: Update npm for trusted publishing
         run: npm install -g npm@11
 
@@ -76,15 +78,21 @@ jobs:
       # When changesets are pending this push only updated the release PR, so
       # publishing is skipped; when none are pending (the release PR was just
       # merged) this publishes any version not yet on the registry.
+      # Whether a publish is needed is decided by asking the registry, not by
+      # parsing changeset output (its log format changed in @changesets/cli v3).
       - name: Publish to npm
         id: publish
         if: steps.pending.outputs.changesets == 'false'
         shell: bash
         run: |
-          pnpm changeset publish | tee publish-output.log
-          if grep -q "New tag:" publish-output.log; then
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "nestjs-mixpanel@${VERSION}" version >/dev/null 2>&1; then
+            echo "nestjs-mixpanel@${VERSION} is already on the registry; nothing to publish."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            pnpm changeset publish
             echo "published=true" >> "$GITHUB_OUTPUT"
-            echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Push Git Tag and Create GitHub Release
