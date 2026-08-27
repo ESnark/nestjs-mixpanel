@@ -59,16 +59,33 @@ export class AnalyticsService {
 The module provides multiple strategies to automatically identify users:
 
 
-#### 1. AsyncStorage Context ID (Default)
+#### 1. Anonymous (Default)
 
-If no identification strategy is specified, the module will use a unique ID from the AsyncLocalStorage context:
+If no identification strategy is specified — or the configured strategy fails to extract an ID for a request — events are sent with an empty `distinct_id`. This is Mixpanel's documented way to send events that are not associated with any user, so unresolved identities never pollute unique-user counts, funnels, or retention reports:
 
 ```typescript
 MixpanelModule.forRoot({
   token: 'YOUR_MIXPANEL_TOKEN',
-  // Will use AsyncLocalStorage context ID as distinct_id
+  // Events without a resolved user ID are sent anonymously (distinct_id: '')
 })
 ```
+
+When a strategy is configured but extraction fails, a warning is logged once so silent misconfigurations are visible.
+
+You can change what happens when no user ID is resolved with the `fallback` option:
+
+```typescript
+MixpanelModule.forRoot({
+  token: 'YOUR_MIXPANEL_TOKEN',
+  user: 'id',
+  // 'anonymous' (default): distinct_id is '' when extraction fails
+  // 'request-context':     use a random UUID generated per request (v1 behavior)
+  // custom resolver:       derive an ID from the request yourself
+  fallback: (request: any) => request?.sessionID,
+})
+```
+
+> **Warning**: `fallback: 'request-context'` restores the pre-2.0 behavior. Because the ID is regenerated on every request, the same user appears as a different user on each request — unique-user counts, funnels, and retention will be distorted. Prefer the default or a resolver backed by something request-independent (e.g. a session ID).
 
 #### 2. Header-based Identification
 
@@ -243,7 +260,9 @@ this.mixpanel.people.setOnce({
 
 #### `extractUserId(): string | undefined`
 
-Internal method that extracts the user ID based on the configured identification strategy. Returns the extracted user ID or falls back to the AsyncLocalStorage context ID.
+Internal method that extracts the user ID based on the configured identification strategy. Returns the extracted user ID, the result of the configured `fallback` strategy, or `undefined` when the identity stays anonymous.
+
+Note: `people.set()` / `people.setOnce()` calls without an explicit distinct ID are skipped (with a warning) when no user identity can be resolved — profile updates are never written to an anonymous or per-request identity.
 
 ## Advanced Usage
 
@@ -289,4 +308,13 @@ pnpm test:ui      # Open test UI
 ### Requirements
 
 - Node.js >= 20.0.0
-- NestJS >= 11.0.0
+- NestJS >= 11.0.0 (peer dependency — provided by your application)
+
+## Migrating from 1.x
+
+Version 2.0.0 contains the following breaking changes:
+
+1. **The per-request UUID fallback is no longer the default.** In 1.x, when no identification strategy was configured or extraction failed, `distinct_id` was set to a random UUID generated per request — which made every request look like a different user and corrupted unique-user counts, funnels, and retention. In 2.x the default is anonymous (`distinct_id: ''`). If you depended on the old behavior, opt back in with `fallback: 'request-context'`.
+2. **`people.set()` / `people.setOnce()` without an explicit distinct ID are skipped** (with a warning) when no user identity can be resolved, instead of creating a throwaway profile.
+3. **`@nestjs/common`, `@nestjs/core`, `reflect-metadata`, and `rxjs` are now peer dependencies.** Your application provides them (it already does in any NestJS project), so the module always uses your app's Nest instance.
+4. **The bundled Mixpanel SDK is upgraded from `mixpanel@^0.18` to `mixpanel@^0.23`.** Note: mixpanel 0.23.0 has an upstream bug that crashes `init` when an `HTTPS_PROXY`/`HTTP_PROXY` environment variable is set (it constructs the `https-proxy-agent` v7 module namespace instead of its named export). If your servers sit behind an HTTP proxy, unset those variables for the process or wait for an upstream fix.

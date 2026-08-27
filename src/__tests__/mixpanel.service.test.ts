@@ -59,6 +59,33 @@ describe('MixpanelService', () => {
     vi.clearAllMocks();
   });
 
+  const createServiceWithOptions = async (options: MixpanelModuleOptions) => {
+    const asyncStorage = {
+      get: vi.fn(),
+      getId: vi.fn().mockReturnValue('cls-context-123'),
+      getRequest: vi.fn(),
+      getUser: vi.fn(),
+      getSession: vi.fn(),
+      getCookie: vi.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        MixpanelService,
+        {
+          provide: 'MIXPANEL_OPTIONS',
+          useValue: options,
+        },
+        AsyncStorageService,
+      ],
+    })
+      .overrideProvider(AsyncStorageService)
+      .useValue(asyncStorage)
+      .compile();
+
+    return { service: module.get<MixpanelService>(MixpanelService), asyncStorage };
+  };
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
@@ -73,7 +100,7 @@ describe('MixpanelService', () => {
       service.track(event);
 
       expect(mockTrack).toHaveBeenCalledWith(event, {
-        distinct_id: 'default-cls-id', // Fallback to AsyncStorage ID when header is missing
+        distinct_id: '', // Anonymous when header is missing
       });
     });
 
@@ -88,7 +115,7 @@ describe('MixpanelService', () => {
 
       expect(mockTrack).toHaveBeenCalledWith(event, {
         action: 'click',
-        distinct_id: 'default-cls-id', // Fallback to AsyncStorage ID when header is missing
+        distinct_id: '', // Anonymous when header is missing
       });
     });
 
@@ -117,7 +144,7 @@ describe('MixpanelService', () => {
       service.track(event);
 
       expect(mockTrack).toHaveBeenCalledWith(event, {
-        distinct_id: 'default-cls-id', // Should fallback to AsyncStorage ID
+        distinct_id: '', // Anonymous when there is no request context
       });
     });
   });
@@ -205,75 +232,66 @@ describe('MixpanelService', () => {
       expect(userId).toBe('user-456');
     });
 
-    it('should fallback to AsyncStorage context ID when no specific field is configured', async () => {
-      const fallbackOptions: MixpanelModuleOptions = {
+    it('should return undefined when no strategy is configured (anonymous default)', async () => {
+      const { service: fallbackService, asyncStorage } = await createServiceWithOptions({
         token: 'test-token',
-      };
-
-      const fallbackAsyncStorageService = {
-        getId: vi.fn().mockReturnValue('cls-context-123'),
-        get: vi.fn(),
-        getRequest: vi.fn(),
-        getUser: vi.fn(),
-        getSession: vi.fn(),
-      };
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          MixpanelService,
-          {
-            provide: 'MIXPANEL_OPTIONS',
-            useValue: fallbackOptions,
-          },
-          AsyncStorageService,
-        ],
-      })
-        .overrideProvider(AsyncStorageService)
-        .useValue(fallbackAsyncStorageService)
-        .compile();
-
-      const fallbackService = module.get<MixpanelService>(MixpanelService);
+      });
 
       const userId = fallbackService.extractUserId();
-      expect(userId).toBe('cls-context-123');
-      expect(fallbackAsyncStorageService.getId).toHaveBeenCalled();
+      expect(userId).toBeUndefined();
+      expect(asyncStorage.getId).not.toHaveBeenCalled();
     });
 
-    it('should use AsyncStorage context ID in tracking when no specific field is configured', async () => {
-      const fallbackOptions: MixpanelModuleOptions = {
+    it('should track anonymously when no strategy is configured (anonymous default)', async () => {
+      const { service: fallbackService } = await createServiceWithOptions({
         token: 'test-token',
-      };
-
-      const fallbackAsyncStorageService = {
-        getId: vi.fn().mockReturnValue('cls-context-456'),
-        get: vi.fn(),
-        getRequest: vi.fn(),
-        getUser: vi.fn(),
-        getSession: vi.fn(),
-      };
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          MixpanelService,
-          {
-            provide: 'MIXPANEL_OPTIONS',
-            useValue: fallbackOptions,
-          },
-          AsyncStorageService,
-        ],
-      })
-        .overrideProvider(AsyncStorageService)
-        .useValue(fallbackAsyncStorageService)
-        .compile();
-
-      const fallbackService = module.get<MixpanelService>(MixpanelService);
+      });
 
       fallbackService.track('test-event', { action: 'click' });
 
       expect(mockTrack).toHaveBeenCalledWith('test-event', {
         action: 'click',
-        distinct_id: 'cls-context-456',
+        distinct_id: '',
       });
+    });
+
+    it('should use the request context ID when fallback is request-context', async () => {
+      const { service: fallbackService, asyncStorage } = await createServiceWithOptions({
+        token: 'test-token',
+        fallback: 'request-context',
+      });
+
+      const userId = fallbackService.extractUserId();
+      expect(userId).toBe('cls-context-123');
+      expect(asyncStorage.getId).toHaveBeenCalled();
+
+      fallbackService.track('test-event', { action: 'click' });
+      expect(mockTrack).toHaveBeenCalledWith('test-event', {
+        action: 'click',
+        distinct_id: 'cls-context-123',
+      });
+    });
+
+    it('should use a custom fallback resolver when provided', async () => {
+      const fallbackFn = vi.fn().mockReturnValue('session-abc');
+      const { service: fallbackService, asyncStorage } = await createServiceWithOptions({
+        token: 'test-token',
+        fallback: fallbackFn,
+      });
+      asyncStorage.getRequest.mockReturnValue({ sessionID: 'session-abc' });
+
+      const userId = fallbackService.extractUserId();
+      expect(userId).toBe('session-abc');
+      expect(fallbackFn).toHaveBeenCalledWith({ sessionID: 'session-abc' });
+    });
+
+    it('should stay anonymous when the custom fallback resolver returns undefined', async () => {
+      const { service: fallbackService } = await createServiceWithOptions({
+        token: 'test-token',
+        fallback: () => undefined,
+      });
+
+      expect(fallbackService.extractUserId()).toBeUndefined();
     });
   });
 
@@ -320,10 +338,10 @@ describe('MixpanelService', () => {
       expect(cookieAsyncStorageService.getCookie).toHaveBeenCalledWith('userId');
     });
 
-    it('should fallback to AsyncStorage context ID when the cookie is missing', async () => {
+    it('should return undefined when the cookie is missing (anonymous default)', async () => {
       const { cookieService } = await createCookieService(undefined);
 
-      expect(cookieService.extractUserId()).toBe('default-cls-id');
+      expect(cookieService.extractUserId()).toBeUndefined();
     });
   });
 
@@ -366,6 +384,22 @@ describe('MixpanelService', () => {
         {},
         undefined,
       );
+    });
+
+    it('should skip people.set when no user identity is resolved', () => {
+      asyncStorageService.getRequest.mockReturnValue({ headers: {} });
+
+      service.people.set({ name: 'John' });
+
+      expect(mockPeopleSet).not.toHaveBeenCalled();
+    });
+
+    it('should skip people.setOnce when no user identity is resolved', () => {
+      asyncStorageService.getRequest.mockReturnValue({ headers: {} });
+
+      service.people.setOnce({ created_at: '2025-01-01' });
+
+      expect(mockPeopleSetOnce).not.toHaveBeenCalled();
     });
   });
 });

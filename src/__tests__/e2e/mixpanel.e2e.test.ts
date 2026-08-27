@@ -104,11 +104,10 @@ describe('MixpanelModule E2E Tests', () => {
       });
     });
 
-    it('should fallback to AsyncStorage context ID when header is missing', async () => {
+    it('should return no user ID when header is missing (anonymous default)', async () => {
       const response = await request(app.getHttpServer()).post('/extract-user-id').expect(201);
 
-      expect(response.body.userId).toBeDefined();
-      expect(response.body.userId).toMatch(/^[a-zA-Z0-9-]+$/); // AsyncStorage generates UUID-like IDs
+      expect(response.body.userId).toBeUndefined();
     });
   });
 
@@ -283,7 +282,7 @@ describe('MixpanelModule E2E Tests', () => {
 
   describe('AsyncStorage Context', () => {
     it('should properly clean up AsyncStorage context', async () => {
-      const TestModule = createTestModule({});
+      const TestModule = createTestModule({ fallback: 'request-context' });
 
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [TestModule],
