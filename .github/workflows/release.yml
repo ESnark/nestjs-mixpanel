@@ -7,6 +7,14 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
+# id-token: write is required for npm trusted publishing (OIDC).
+# contents/pull-requests: write are required by changesets/action to push the
+# release branch and open the release PR, and by the tag/release steps below.
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
 jobs:
   release:
     name: Release
@@ -29,28 +37,53 @@ jobs:
           node-version: 20
           cache: 'pnpm'
 
+      # Trusted publishing requires npm >= 11.5.1; Node 20 bundles npm 10.
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@11
+
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
 
-      - name: Create Release Pull Request or Publish to npm
+      - name: Create Release Pull Request
         id: changesets
         uses: changesets/action@v1
         with:
-          # This expects you to have a script called release which does a build for your packages and calls changeset publish
-          publish: pnpm changeset publish
           version: pnpm changeset version
           commit: "chore: release"
           title: "chore: release"
-          createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish Success
-        if: steps.changesets.outputs.published == 'true'
+      # Publishing runs outside changesets/action so that npm authenticates via
+      # OIDC (trusted publishing) with no token and no .npmrc involved.
+      # When changesets are pending this push only updated the release PR, so
+      # publishing is skipped; when none are pending (the release PR was just
+      # merged) this publishes any version not yet on the registry.
+      - name: Publish to npm
+        id: publish
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        shell: bash
         run: |
-          echo "🎉 Successfully published to npm!"
-          echo "📦 Published packages: ${{ steps.changesets.outputs.publishedPackages }}"
+          pnpm changeset publish | tee publish-output.log
+          if grep -q "New tag:" publish-output.log; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push Git Tag and Create GitHub Release
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.publish.outputs.version }}
+        run: |
+          git push origin --tags
+          awk -v ver="$VERSION" '$0 == "## " ver {flag=1; next} /^## / {flag=0} flag' CHANGELOG.md > release-notes.md
+          if [ -s release-notes.md ]; then
+            gh release create "v${VERSION}" --title "v${VERSION}" --notes-file release-notes.md
+          else
+            gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes
+          fi
+          echo "🎉 Successfully published v${VERSION} to npm"

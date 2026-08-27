@@ -6,10 +6,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock mixpanel at the module level
 const mockTrack = vi.fn();
+const mockPeopleSet = vi.fn();
+const mockPeopleSetOnce = vi.fn();
 vi.mock('mixpanel', () => ({
   default: {
     init: vi.fn(() => ({
       track: mockTrack,
+      people: {
+        set: mockPeopleSet,
+        set_once: mockPeopleSetOnce,
+      },
     })),
   },
 }));
@@ -241,6 +247,9 @@ describe('MixpanelService', () => {
       const fallbackAsyncStorageService = {
         getId: vi.fn().mockReturnValue('cls-context-456'),
         get: vi.fn(),
+        getRequest: vi.fn(),
+        getUser: vi.fn(),
+        getSession: vi.fn(),
       };
 
       const module: TestingModule = await Test.createTestingModule({
@@ -265,6 +274,98 @@ describe('MixpanelService', () => {
         action: 'click',
         distinct_id: 'cls-context-456',
       });
+    });
+  });
+
+  describe('cookie extraction', () => {
+    const createCookieService = async (cookieValue: string | undefined) => {
+      const cookieOptions: MixpanelModuleOptions = {
+        token: 'test-token',
+        cookie: 'userId',
+      };
+
+      const cookieAsyncStorageService = {
+        get: vi.fn(),
+        getId: vi.fn().mockReturnValue('default-cls-id'),
+        getRequest: vi.fn(),
+        getUser: vi.fn(),
+        getSession: vi.fn(),
+        getCookie: vi.fn().mockReturnValue(cookieValue),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MixpanelService,
+          {
+            provide: 'MIXPANEL_OPTIONS',
+            useValue: cookieOptions,
+          },
+          AsyncStorageService,
+        ],
+      })
+        .overrideProvider(AsyncStorageService)
+        .useValue(cookieAsyncStorageService)
+        .compile();
+
+      return {
+        cookieService: module.get<MixpanelService>(MixpanelService),
+        cookieAsyncStorageService,
+      };
+    };
+
+    it('should use the cookie value as the user ID', async () => {
+      const { cookieService, cookieAsyncStorageService } = await createCookieService('abc123');
+
+      expect(cookieService.extractUserId()).toBe('abc123');
+      expect(cookieAsyncStorageService.getCookie).toHaveBeenCalledWith('userId');
+    });
+
+    it('should fallback to AsyncStorage context ID when the cookie is missing', async () => {
+      const { cookieService } = await createCookieService(undefined);
+
+      expect(cookieService.extractUserId()).toBe('default-cls-id');
+    });
+  });
+
+  describe('people', () => {
+    beforeEach(() => {
+      asyncStorageService.getRequest.mockReturnValue({
+        headers: { 'x-user-id': 'user-123' },
+      });
+    });
+
+    it('should set profile properties with an explicit distinct ID', () => {
+      service.people.set('explicit-id', { name: 'John' });
+
+      expect(mockPeopleSet).toHaveBeenCalledWith('explicit-id', { name: 'John' }, {}, undefined);
+    });
+
+    it('should set profile properties using the extracted user ID', () => {
+      service.people.set({ name: 'John' });
+
+      expect(mockPeopleSet).toHaveBeenCalledWith('user-123', { name: 'John' }, {}, undefined);
+    });
+
+    it('should set profile properties once with an explicit distinct ID', () => {
+      service.people.setOnce('explicit-id', { created_at: '2025-01-01' });
+
+      expect(mockPeopleSetOnce).toHaveBeenCalledWith(
+        'explicit-id',
+        { created_at: '2025-01-01' },
+        {},
+        undefined,
+      );
+    });
+
+    it('should set profile properties once using the extracted user ID', () => {
+      service.people.setOnce({ created_at: '2025-01-01' });
+
+      expect(mockPeopleSetOnce).toHaveBeenCalledWith(
+        'user-123',
+        { created_at: '2025-01-01' },
+        {},
+        undefined,
+      );
     });
   });
 });
