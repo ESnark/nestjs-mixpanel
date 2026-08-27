@@ -90,6 +90,13 @@ describe('MixpanelService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('client', () => {
+    it('should expose the underlying mixpanel client', () => {
+      expect(service.client).toBeDefined();
+      expect(service.client.track).toBe(mockTrack);
+    });
+  });
+
   describe('track', () => {
     it('should track an event with no properties', () => {
       // Mock empty request for header extraction

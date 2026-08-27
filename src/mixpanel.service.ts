@@ -186,6 +186,16 @@ export class MixpanelService {
     }
   }
 
+  /**
+   * The underlying mixpanel-node instance, for APIs this module does not
+   * wrap (batch tracking, groups, `people.increment`, imports, ...).
+   * Calls made directly on the client bypass this module's automatic user
+   * identification and IP resolution.
+   */
+  get client(): Mixpanel.Mixpanel {
+    return this.mixpanel;
+  }
+
   get people(): { set: PeopleFunction; setOnce: PeopleFunction } {
     return {
       set: this.peopleSet.bind(this) as PeopleFunction,

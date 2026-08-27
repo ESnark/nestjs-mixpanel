@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Production dependencies (mixpanel) get individual PRs so SDK updates
+  # are visible and land promptly; dev dependencies are grouped weekly.
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    groups:
+      dev-dependencies:
+        dependency-type: 'development'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
