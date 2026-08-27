@@ -141,6 +141,44 @@ MixpanelModule.forRoot({
 })
 ```
 
+### Merging Anonymous and Identified Users (Simplified ID Merge)
+
+With an identification strategy alone, events sent before login stay anonymous forever. Enabling `idMerge` connects them: the module maintains a **device ID cookie** (minting a UUID and setting the cookie on the first request), attaches `$device_id` to every event, and adds `$user_id` whenever the identification strategy resolves a user. Mixpanel's [Simplified ID Merge](https://docs.mixpanel.com/docs/tracking-methods/id-management) then merges the pre-login anonymous events and post-login identified events into a single user — funnels and retention work across the login boundary.
+
+```typescript
+MixpanelModule.forRoot({
+  token: 'YOUR_MIXPANEL_TOKEN',
+  user: 'id',
+  idMerge: true,
+})
+```
+
+Cookie attributes can be customized:
+
+```typescript
+MixpanelModule.forRoot({
+  token: 'YOUR_MIXPANEL_TOKEN',
+  user: 'id',
+  idMerge: {
+    name: 'mp_device_id',    // default
+    maxAge: 31536000,        // seconds; default 1 year
+    path: '/',               // default
+    sameSite: 'Lax',         // default; 'None' automatically adds Secure
+    secure: true,            // default false — enable in production over HTTPS
+    httpOnly: true,          // default
+    // domain: '.example.com',
+  },
+})
+```
+
+Notes:
+
+- Your Mixpanel project must use the **Simplified ID Merge API** (the default for new projects — check Project Settings → Identity Merge).
+- Reading cookies does **not** require `cookie-parser`; the middleware parses the `Cookie` header itself (and prefers `cookie-parser` output when present).
+- When `idMerge` is enabled the `fallback` option is ignored — the device identity is the anonymous identity. Events without a device ID (e.g. background jobs outside a request) are sent anonymously.
+- Profile updates (`people.set` / `people.setOnce` without an explicit distinct ID) still require a resolved user ID; they are never written to a device identity.
+- The module sets a cookie on your users' browsers. Depending on your jurisdiction (e.g. GDPR/ePrivacy), analytics cookies may require user consent — gating tracking on consent is your application's responsibility.
+
 ### Additional Configuration
 
 #### IP Address Tracking

@@ -22,11 +22,45 @@ export type FallbackIdStrategy =
   | 'request-context'
   | ((request: unknown) => string | undefined);
 
+/**
+ * Device ID cookie attributes for Simplified ID Merge.
+ */
+export type IdMergeCookieOptions = {
+  /** Cookie name. Default: `'mp_device_id'` */
+  name?: string;
+  /** Max-Age in seconds. Default: `31536000` (1 year) */
+  maxAge?: number;
+  /** Default: `'/'` */
+  path?: string;
+  domain?: string;
+  /**
+   * Default: `'Lax'`. `'None'` automatically adds the `Secure` attribute,
+   * as required by browsers.
+   */
+  sameSite?: 'Strict' | 'Lax' | 'None';
+  /** Default: `false`. Enable in production when serving over HTTPS. */
+  secure?: boolean;
+  /** Default: `true` — the cookie only exists for server-side analytics. */
+  httpOnly?: boolean;
+};
+
 type CommonModuleOptions = {
   token: MixpanelProjectToken;
   initConfig?: InitConfig;
   ipHeader?: IpHeaderOption;
   fallback?: FallbackIdStrategy;
+  /**
+   * Enables Mixpanel Simplified ID Merge support. The middleware maintains a
+   * device ID cookie (minting a UUID and setting the cookie when absent), and
+   * every event carries `$device_id` — plus `$user_id` when the identification
+   * strategy resolves one — so anonymous pre-login events and identified
+   * post-login events are merged into a single user by Mixpanel.
+   *
+   * Requires the Mixpanel project to use the Simplified ID Merge API. When
+   * enabled, the `fallback` option is ignored: the device identity IS the
+   * anonymous identity.
+   */
+  idMerge?: boolean | IdMergeCookieOptions;
 };
 
 export type MixpanelModuleOptions =

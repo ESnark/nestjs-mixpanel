@@ -5,6 +5,7 @@ import { REQUEST_CTX_KEY } from './constant.js';
 
 export interface AsyncStorageContext {
   id: string;
+  deviceId?: string;
   request?: any;
   [key: string]: any;
 }
@@ -36,6 +37,11 @@ export class AsyncStorageService {
   getId(): string | undefined {
     const store = AsyncStorageService.storage.getStore();
     return store?.id;
+  }
+
+  getDeviceId(): string | undefined {
+    const store = AsyncStorageService.storage.getStore();
+    return store?.deviceId;
   }
 
   getRequest(): any {

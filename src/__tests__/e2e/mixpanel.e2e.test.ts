@@ -280,6 +280,50 @@ describe('MixpanelModule E2E Tests', () => {
     });
   });
 
+  describe('ID merge', () => {
+    beforeEach(async () => {
+      const TestModule = createTestModule({ header: 'x-user-id', idMerge: true });
+
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        imports: [TestModule],
+      }).compile();
+
+      app = moduleFixture.createNestApplication();
+      await app.init();
+    });
+
+    it('should mint a device cookie and merge anonymous and identified events', async () => {
+      // Anonymous request mints the device cookie
+      const first = await request(app.getHttpServer()).post('/track').expect(201);
+
+      const setCookie = first.headers['set-cookie']?.[0];
+      expect(setCookie).toContain('mp_device_id=');
+      const deviceId = setCookie.match(/mp_device_id=([^;]+)/)?.[1];
+      expect(deviceId).toBeDefined();
+
+      expect(mockTrack).toHaveBeenLastCalledWith('test-event', {
+        action: 'e2e-test',
+        distinct_id: `$device:${deviceId}`,
+        $device_id: deviceId,
+      });
+
+      // Identified request presenting the same cookie carries both identities
+      const second = await request(app.getHttpServer())
+        .post('/track')
+        .set('Cookie', `mp_device_id=${deviceId}`)
+        .set('x-user-id', 'user-77')
+        .expect(201);
+
+      expect(second.headers['set-cookie']).toBeUndefined();
+      expect(mockTrack).toHaveBeenLastCalledWith('test-event', {
+        action: 'e2e-test',
+        distinct_id: 'user-77',
+        $device_id: deviceId,
+        $user_id: 'user-77',
+      });
+    });
+  });
+
   describe('AsyncStorage Context', () => {
     it('should properly clean up AsyncStorage context', async () => {
       const TestModule = createTestModule({ fallback: 'request-context' });
