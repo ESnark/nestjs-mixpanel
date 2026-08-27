@@ -33,6 +33,7 @@ describe('MixpanelService', () => {
     asyncStorageService = {
       get: vi.fn(),
       getId: vi.fn().mockReturnValue('default-cls-id'),
+      getDeviceId: vi.fn(),
       getRequest: vi.fn(),
       getUser: vi.fn(),
       getSession: vi.fn(),
@@ -63,6 +64,7 @@ describe('MixpanelService', () => {
     const asyncStorage = {
       get: vi.fn(),
       getId: vi.fn().mockReturnValue('cls-context-123'),
+      getDeviceId: vi.fn(),
       getRequest: vi.fn(),
       getUser: vi.fn(),
       getSession: vi.fn(),
@@ -299,6 +301,76 @@ describe('MixpanelService', () => {
       });
 
       expect(fallbackService.extractUserId()).toBeUndefined();
+    });
+  });
+
+  describe('ID merge', () => {
+    it('should track device-only events with $device_id and a derived distinct_id', async () => {
+      const { service: idService, asyncStorage } = await createServiceWithOptions({
+        token: 'test-token',
+        header: 'x-user-id',
+        idMerge: true,
+      });
+      asyncStorage.getRequest.mockReturnValue({ headers: {} });
+      asyncStorage.getDeviceId.mockReturnValue('device-abc');
+
+      idService.track('page_viewed');
+
+      expect(mockTrack).toHaveBeenCalledWith('page_viewed', {
+        distinct_id: '$device:device-abc',
+        $device_id: 'device-abc',
+      });
+    });
+
+    it('should attach both $device_id and $user_id when the user is identified', async () => {
+      const { service: idService, asyncStorage } = await createServiceWithOptions({
+        token: 'test-token',
+        header: 'x-user-id',
+        idMerge: true,
+      });
+      asyncStorage.getRequest.mockReturnValue({ headers: { 'x-user-id': 'user-9' } });
+      asyncStorage.getDeviceId.mockReturnValue('device-abc');
+
+      idService.track('purchase', { amount: 10 });
+
+      expect(mockTrack).toHaveBeenCalledWith('purchase', {
+        distinct_id: 'user-9',
+        $device_id: 'device-abc',
+        $user_id: 'user-9',
+        amount: 10,
+      });
+    });
+
+    it('should stay anonymous when no device ID is available (non-HTTP context)', async () => {
+      const { service: idService, asyncStorage } = await createServiceWithOptions({
+        token: 'test-token',
+        idMerge: true,
+      });
+      asyncStorage.getDeviceId.mockReturnValue(undefined);
+
+      idService.track('background-job');
+
+      expect(mockTrack).toHaveBeenCalledWith('background-job', {
+        distinct_id: '',
+      });
+    });
+
+    it('should ignore the fallback option when ID merge is enabled', async () => {
+      const { service: idService, asyncStorage } = await createServiceWithOptions({
+        token: 'test-token',
+        idMerge: true,
+        fallback: 'request-context',
+      });
+      asyncStorage.getDeviceId.mockReturnValue('device-abc');
+
+      expect(idService.extractUserId()).toBeUndefined();
+      expect(asyncStorage.getId).not.toHaveBeenCalled();
+
+      idService.track('page_viewed');
+      expect(mockTrack).toHaveBeenCalledWith('page_viewed', {
+        distinct_id: '$device:device-abc',
+        $device_id: 'device-abc',
+      });
     });
   });
 

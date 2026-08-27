@@ -4,4 +4,5 @@ export type {
   MixpanelModuleOptions,
   MixpanelModuleAsyncOptions,
   FallbackIdStrategy,
+  IdMergeCookieOptions,
 } from './interface.js';

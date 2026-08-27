@@ -41,12 +41,16 @@ export class MixpanelService {
 
   track: TrackFunction = (event, properties, callback) => {
     const userId = this.extractUserId();
+    const deviceId = this.options.idMerge ? this.asyncStorage.getDeviceId() : undefined;
     const ip = this.getIp();
     const finalProperties = {
       // An empty distinct_id is Mixpanel's documented way to send an event
       // that is not associated with any user, so unresolved identities do
-      // not pollute unique-user counts.
-      distinct_id: userId ?? '',
+      // not pollute unique-user counts. With ID merge, `$device:<uuid>` is
+      // the distinct_id Mixpanel derives for device-only events.
+      distinct_id: userId ?? (deviceId ? `$device:${deviceId}` : ''),
+      ...(deviceId && { $device_id: deviceId }),
+      ...(deviceId && userId && { $user_id: userId }),
       ...(ip && { ip }),
       ...properties,
     };
@@ -234,33 +238,23 @@ export class MixpanelService {
 
   extractUserId(): string | undefined {
     try {
-      let userId: string | undefined;
-      let strategyConfigured = true;
-
-      if ('header' in this.options) {
-        const request = this.asyncStorage.getRequest();
-        userId = request?.headers?.[this.options.header.toLowerCase()];
-      } else if ('session' in this.options) {
-        const session = this.asyncStorage.getSession();
-        userId = this.extractValue(this.options.session, session);
-      } else if ('user' in this.options) {
-        const user = this.asyncStorage.getUser();
-        userId = this.extractValue(this.options.user, user);
-      } else if ('cookie' in this.options) {
-        userId = this.asyncStorage.getCookie(this.options.cookie);
-      } else {
-        strategyConfigured = false;
-      }
+      const userId = this.extractStrategyUserId();
 
       if (userId) {
         return userId;
       }
 
-      if (strategyConfigured && !this.warnedExtractionFailure) {
+      if (this.hasStrategy() && !this.warnedExtractionFailure) {
         this.warnedExtractionFailure = true;
         this.logger.warn(
           'Could not extract a user ID with the configured identification strategy; the fallback identity will be used. This is logged only once.',
         );
+      }
+
+      // With ID merge, the device identity is the anonymous identity, so the
+      // fallback option does not apply.
+      if (this.options.idMerge) {
+        return undefined;
       }
 
       return this.resolveFallbackId();
@@ -268,6 +262,34 @@ export class MixpanelService {
       this.logger.warn(`Failed to extract user ID from request: ${error}`);
     }
 
+    return undefined;
+  }
+
+  private hasStrategy(): boolean {
+    return (
+      'header' in this.options ||
+      'session' in this.options ||
+      'user' in this.options ||
+      'cookie' in this.options
+    );
+  }
+
+  private extractStrategyUserId(): string | undefined {
+    if ('header' in this.options) {
+      const request = this.asyncStorage.getRequest();
+      return request?.headers?.[this.options.header.toLowerCase()];
+    }
+    if ('session' in this.options) {
+      const session = this.asyncStorage.getSession();
+      return this.extractValue(this.options.session, session);
+    }
+    if ('user' in this.options) {
+      const user = this.asyncStorage.getUser();
+      return this.extractValue(this.options.user, user);
+    }
+    if ('cookie' in this.options) {
+      return this.asyncStorage.getCookie(this.options.cookie);
+    }
     return undefined;
   }
 
