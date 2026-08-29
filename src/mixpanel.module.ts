@@ -8,7 +8,9 @@ import { AsyncStorageMiddleware } from './async-storage.middleware.js';
 @Module({})
 export class MixpanelModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AsyncStorageMiddleware).forRoutes('*');
+    // '{*splat}' is the named wildcard introduced with path-to-regexp v8
+    // (NestJS >= 11); the braces make it match the root path as well.
+    consumer.apply(AsyncStorageMiddleware).forRoutes('{*splat}');
   }
   static forRoot(options: MixpanelModuleOptions): DynamicModule {
     return {

@@ -362,7 +362,7 @@ pnpm test:ui      # Open test UI
 ### Requirements
 
 - Node.js >= 20.0.0
-- NestJS >= 11.0.0 (peer dependency — provided by your application)
+- NestJS 11.x or 12.x (peer dependency — provided by your application)
 
 ## Migrating from 1.x
 

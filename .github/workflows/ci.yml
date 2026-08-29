@@ -12,12 +12,18 @@ concurrency:
 
 jobs:
   test:
-    name: Node ${{ matrix.node-version }}
+    name: Node ${{ matrix.node-version }} / NestJS ${{ matrix.nest-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         node-version: [20, 22, 24]
+        # devDependencies pin the newest supported NestJS major; the include
+        # below adds one job against the oldest supported major.
+        nest-version: [12]
+        include:
+          - node-version: 22
+            nest-version: 11
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v7
@@ -35,6 +41,10 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install NestJS ${{ matrix.nest-version }}
+        if: matrix.nest-version != 12
+        run: pnpm add -D @nestjs/common@^11.0.0 @nestjs/core@^11.0.0 @nestjs/platform-express@^11.0.0 @nestjs/testing@^11.0.0
 
       - name: Lint
         run: pnpm lint
